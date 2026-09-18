@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# Renders the tmux statusline GIT badge: branch name, colored by
+# clean/dirty/ahead/behind/diverged. Read-only — no push/pull/sync actions
+# live here (those are host-only `wkt` commands).
+set -u
+
+repo_dir=$(printf '%s\n' /workspace/*/ 2>/dev/null | head -n1)
+if [ -z "$repo_dir" ] || ! git -C "$repo_dir" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  echo "#[fg=colour8]no-repo#[fg=default]"
+  exit 0
+fi
+
+branch=$(git -C "$repo_dir" symbolic-ref --short HEAD 2>/dev/null)
+if [ -z "$branch" ]; then
+  branch=$(git -C "$repo_dir" rev-parse --short HEAD 2>/dev/null)
+fi
+
+dirty=""
+[ -n "$(git -C "$repo_dir" status --porcelain 2>/dev/null)" ] && dirty=1
+
+ahead=0
+behind=0
+if git -C "$repo_dir" rev-parse --verify --quiet '@{u}' >/dev/null 2>&1; then
+  read -r ahead behind < <(git -C "$repo_dir" rev-list --left-right --count 'HEAD...@{u}' 2>/dev/null)
+fi
+
+if [ -n "$dirty" ] && { [ "$ahead" != "0" ] || [ "$behind" != "0" ]; }; then
+  color=colour1 # red: dirty + diverged
+elif [ -n "$dirty" ]; then
+  color=colour1 # red: dirty
+elif [ "$ahead" != "0" ] && [ "$behind" != "0" ]; then
+  color=colour5 # magenta: diverged
+elif [ "$ahead" != "0" ]; then
+  color=colour6 # cyan: ahead
+elif [ "$behind" != "0" ]; then
+  color=colour3 # yellow: behind
+else
+  color=colour2 # green: clean
+fi
+
+echo "#[fg=${color}]${branch}#[fg=default]"

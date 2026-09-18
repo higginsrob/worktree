@@ -73,7 +73,7 @@ async function createContainerFor(
     throw new Error('image not found locally — run "wkt build-image" first');
   }
   const identity = await getUserIdentity(record.repoRoot);
-  const env: Record<string, string> = {};
+  const env: Record<string, string> = { WKT_REPO_NAME: `${record.org}/${record.repo}` };
   if (identity.name) {
     env.GIT_AUTHOR_NAME = identity.name;
     env.GIT_COMMITTER_NAME = identity.name;

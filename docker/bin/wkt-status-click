@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# Dispatches a tmux statusline badge click. Bound from tmux.conf as:
+#   run-shell -b "wkt-status-click '#{mouse_status_range}' '#{pane_current_path}'"
+# so $1/$2 are already resolved by tmux before this script runs.
+set -u
+
+range="$1"
+pane_path="${2:-}"
+
+case "$range" in
+  user\|new-window)
+    tmux new-window -c "$pane_path"
+    ;;
+  user\|split-h)
+    tmux split-window -h -c "$pane_path"
+    ;;
+  user\|split-v)
+    tmux split-window -v -c "$pane_path"
+    ;;
+  user\|workspace)
+    wkt-workspace-badge --plain | osc52-copy
+    ;;
+  user\|git-status)
+    repo_dir=$(printf '%s\n' /workspace/*/ 2>/dev/null | head -n1)
+    tmux display-popup -w 80% -h 60% -E "git -C '$repo_dir' status -sb 2>&1 | less"
+    ;;
+esac

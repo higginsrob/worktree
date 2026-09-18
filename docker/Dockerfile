@@ -76,9 +76,10 @@ RUN sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master
     && rm -f /root/.zshrc \
     && chmod -R go+rX ${ZSH}
 
-# OSC 52 clipboard passthrough helper (wiring into tmux/vim comes in milestone 6).
-COPY bin/osc52-copy /usr/local/bin/osc52-copy
-RUN chmod +x /usr/local/bin/osc52-copy
+# OSC 52 clipboard passthrough + tmux statusline helper scripts.
+COPY bin/osc52-copy bin/wkt-git-badge bin/wkt-workspace-badge bin/wkt-status-click /usr/local/bin/
+RUN chmod +x /usr/local/bin/osc52-copy /usr/local/bin/wkt-git-badge /usr/local/bin/wkt-workspace-badge \
+      /usr/local/bin/wkt-status-click
 
 # System-wide config defaults — independent of the shared home volume's state.
 COPY tmux.conf /etc/tmux.conf

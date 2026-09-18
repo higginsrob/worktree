@@ -1,5 +1,4 @@
-" wkt baseline vim config (system-wide: /etc/vim/vimrc.local).
-" OSC 52 yank integration (project plan decision, milestone 6) is added later.
+" wkt vim config (system-wide: /etc/vim/vimrc.local).
 
 syntax on
 filetype plugin indent on
@@ -25,3 +24,12 @@ set backspace=indent,eol,start
 set updatetime=300
 
 " vim-fugitive is bundled at build time — :Git, :Gdiffsplit, etc.
+
+" OSC 52 clipboard passthrough: yanks reach the host terminal's real
+" clipboard over the docker exec -it PTY, same mechanism as tmux copy-mode.
+if has('autocmd')
+  augroup wkt_osc52_yank
+    autocmd!
+    autocmd TextYankPost * if v:event.operator ==# 'y' | call system('osc52-copy', getreg(v:event.regname)) | endif
+  augroup END
+endif

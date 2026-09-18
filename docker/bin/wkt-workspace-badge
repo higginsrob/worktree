@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Renders (or with --plain, returns unstyled) the tmux statusline WORKSPACE
+# badge: "org/repo · branch". Informational only — click copies this text.
+set -u
+
+repo_dir=$(printf '%s\n' /workspace/*/ 2>/dev/null | head -n1)
+branch=$(git -C "$repo_dir" symbolic-ref --short HEAD 2>/dev/null)
+[ -z "$branch" ] && branch=$(git -C "$repo_dir" rev-parse --short HEAD 2>/dev/null)
+
+text="${WKT_REPO_NAME:-?}"
+[ -n "$branch" ] && text="${text} · ${branch}"
+
+if [ "${1:-}" = "--plain" ]; then
+  echo "$text"
+else
+  echo "#[fg=colour4]${text}#[fg=default]"
+fi

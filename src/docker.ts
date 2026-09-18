@@ -104,6 +104,50 @@ export async function startContainer(name: string): Promise<void> {
   await run(['start', name]);
 }
 
+export async function stopContainer(name: string): Promise<void> {
+  await run(['stop', name]);
+}
+
+export interface ContainerSummary {
+  name: string;
+  running: boolean;
+}
+
+// Anchored (`^prefix`) so the name filter can't substring-match an
+// unrelated container — see project plan decision #6 (never touch
+// non-wkt-managed Docker resources).
+export async function listContainersByPrefix(prefix: string): Promise<ContainerSummary[]> {
+  const out = await run([
+    'ps',
+    '-a',
+    '--filter',
+    `name=^${prefix}`,
+    '--format',
+    '{{.Names}}\t{{.State}}',
+  ]);
+  if (!out) {
+    return [];
+  }
+  return out
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => {
+      const [name, state] = line.split('\t');
+      return { name: name!, running: state === 'running' };
+    });
+}
+
+export async function listVolumesByPrefix(prefix: string): Promise<string[]> {
+  const out = await run(['volume', 'ls', '--filter', `name=^${prefix}`, '--format', '{{.Name}}']);
+  return out ? out.split('\n').filter(Boolean) : [];
+}
+
+// Scoped to images built from docker/Dockerfile (see its dev.wkt.image
+// label) so this can never prune an unrelated dangling image on the host.
+export async function pruneDanglingImages(): Promise<string> {
+  return run(['image', 'prune', '-f', '--filter', 'label=dev.wkt.image=true']);
+}
+
 export interface RunContainerOptions {
   name: string;
   projectVolume: string;

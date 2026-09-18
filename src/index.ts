@@ -15,6 +15,8 @@ import {
   statusAction,
 } from './commands/git.js';
 import { resetAction } from './commands/reset.js';
+import { resetHomeAction } from './commands/reset-home.js';
+import { cleanAction } from './commands/clean.js';
 import { notImplemented } from './commands/stub.js';
 
 const program = new Command();
@@ -86,9 +88,9 @@ program
 
 program
   .command('reset-home')
-  .description('delete + recreate the shared wkt-home volume (stops all containers first)')
+  .description('delete + recreate the shared wkt-home volume (removes all containers first)')
   .option('--yes', 'skip confirmation')
-  .action(notImplemented('reset-home'));
+  .action(resetHomeAction);
 
 program
   .command('rm <name>')
@@ -103,7 +105,7 @@ program
   )
   .option('--yes', 'skip confirmation')
   .option('--dry-run', 'show what would be removed without removing it')
-  .action(notImplemented('clean'));
+  .action(cleanAction);
 
 program
   .command('doctor')

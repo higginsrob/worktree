@@ -30,6 +30,9 @@ import {
   imageExists,
   syncVolumeToHost,
   createPromoteBundle,
+  listContainersByPrefix,
+  listVolumesByPrefix,
+  pruneDanglingImages,
   type ContainerState,
 } from './docker.js';
 import { volumeName, containerName, worktreeName, WORKTREES_DIR, HOME_VOLUME } from './config.js';
@@ -326,4 +329,65 @@ export async function resetWorktree(name: string): Promise<void> {
     await removeVolume(record.volume).catch(() => undefined);
     throw err;
   }
+}
+
+// Removes every wkt container (Docker refuses to remove a volume still
+// referenced by a container, even a stopped one), then deletes and
+// recreates the shared home volume from scratch. Containers themselves are
+// cheap: `wkt open` recreates whichever ones are used again.
+export async function resetHome(): Promise<void> {
+  const state = await readState();
+  for (const record of Object.values(state.worktrees)) {
+    const status = await containerState(record.container);
+    if (status !== 'absent') {
+      await removeContainer(record.container).catch(() => undefined);
+    }
+  }
+  await removeVolume(HOME_VOLUME).catch(() => undefined);
+  await createVolume(HOME_VOLUME);
+}
+
+export interface CleanReport {
+  stoppedContainersRemoved: string[];
+  orphanedVolumesRemoved: string[];
+  imagePruneOutput: string;
+}
+
+// Only ever touches: (1) containers/volumes whose names carry the wkt-*
+// naming convention (never a container/volume this tool didn't create),
+// and (2) image layers labeled dev.wkt.image=true. See project plan
+// decision #6 — cleanup must never reach unrelated Docker resources.
+export async function cleanResources(opts: { dryRun?: boolean } = {}): Promise<CleanReport> {
+  const state = await readState();
+  const trackedVolumes = new Set(Object.values(state.worktrees).map((r) => r.volume));
+
+  const containers = await listContainersByPrefix('wkt-');
+  const stoppedContainersRemoved: string[] = [];
+  for (const container of containers) {
+    if (container.running) {
+      continue;
+    }
+    // A stopped container that's still tracked is safe to remove too: the
+    // volume (the real data) is untouched, and `wkt open` recreates it.
+    if (!opts.dryRun) {
+      await removeContainer(container.name).catch(() => undefined);
+    }
+    stoppedContainersRemoved.push(container.name);
+  }
+
+  const volumes = await listVolumesByPrefix('wkt-vol-');
+  const orphanedVolumesRemoved: string[] = [];
+  for (const volume of volumes) {
+    if (trackedVolumes.has(volume)) {
+      continue;
+    }
+    if (!opts.dryRun) {
+      await removeVolume(volume).catch(() => undefined);
+    }
+    orphanedVolumesRemoved.push(volume);
+  }
+
+  const imagePruneOutput = opts.dryRun ? '' : await pruneDanglingImages();
+
+  return { stoppedContainersRemoved, orphanedVolumesRemoved, imagePruneOutput };
 }

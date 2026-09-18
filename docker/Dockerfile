@@ -3,6 +3,11 @@
 
 FROM ubuntu:24.04
 
+# Lets `wkt clean` scope dangling-image pruning to layers this tool built,
+# never unrelated images on the host (labels survive after a layer goes
+# dangling/untagged, unlike the image's repo:tag).
+LABEL dev.wkt.image="true"
+
 ARG NODE_MAJOR=22
 ARG USERNAME=dev
 ARG USER_UID=1000

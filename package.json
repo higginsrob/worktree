@@ -5,14 +5,33 @@
   "type": "module",
   "license": "MIT",
   "author": "Rob Higgins",
+  "homepage": "https://github.com/higginsrob/worktree#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/higginsrob/worktree.git"
+  },
+  "bugs": {
+    "url": "https://github.com/higginsrob/worktree/issues"
+  },
+  "keywords": [
+    "git",
+    "git-worktree",
+    "docker",
+    "devcontainer",
+    "tmux",
+    "sandbox"
+  ],
   "bin": {
-    "wkt": "./bin/wkt"
+    "wkt": "bin/wkt"
   },
   "files": [
     "bin",
     "dist",
     "docker"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "engines": {
     "node": ">=20"
   },

@@ -10,7 +10,8 @@
   },
   "files": [
     "bin",
-    "dist"
+    "dist",
+    "docker"
   ],
   "engines": {
     "node": ">=20"

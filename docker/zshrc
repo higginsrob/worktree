@@ -1,0 +1,19 @@
+# wkt baseline zsh config (system-wide: /etc/zsh/zshrc.local, sourced from /etc/zsh/zshrc).
+# OSC 52 copy-mode integration (milestone 6) is added later.
+
+export ZSH_CACHE_DIR="${ZSH_CACHE_DIR:-/tmp/oh-my-zsh-cache}"
+mkdir -p "$ZSH_CACHE_DIR" 2>/dev/null || true
+
+ZSH_THEME="robbyrussell"
+# Not "fzf": Ubuntu's fzf package ships its zsh key-bindings/completion only
+# under /usr/share/doc/fzf, which this base image's dpkg policy strips, so
+# oh-my-zsh's fzf plugin errors trying to source files that were never
+# installed. Wiring up fzf keybindings properly is a milestone 6 item.
+plugins=(git)
+
+source "$ZSH/oh-my-zsh.sh"
+
+HISTFILE="$HOME/.zsh_history"
+HISTSIZE=10000
+SAVEHIST=10000
+setopt APPEND_HISTORY SHARE_HISTORY HIST_IGNORE_DUPS

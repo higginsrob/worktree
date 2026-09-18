@@ -1,0 +1,27 @@
+" wkt baseline vim config (system-wide: /etc/vim/vimrc.local).
+" OSC 52 yank integration (project plan decision, milestone 6) is added later.
+
+syntax on
+filetype plugin indent on
+
+set nocompatible
+set number
+set relativenumber
+set expandtab
+set shiftwidth=2
+set tabstop=2
+set softtabstop=2
+set autoindent
+set smartindent
+set incsearch
+set hlsearch
+set ignorecase
+set smartcase
+set mouse=a
+set scrolloff=4
+set wildmenu
+set laststatus=2
+set backspace=indent,eol,start
+set updatetime=300
+
+" vim-fugitive is bundled at build time — :Git, :Gdiffsplit, etc.

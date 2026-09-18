@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
 import { doctorAction } from './commands/doctor.js';
+import { buildImageAction } from './commands/build-image.js';
 import { notImplemented } from './commands/stub.js';
 
 const program = new Command();
@@ -106,7 +107,7 @@ program
 program
   .command('build-image')
   .description('build higginsrob/worktree:latest locally from docker/Dockerfile')
-  .action(notImplemented('build-image'));
+  .action(buildImageAction);
 
 program
   .command('exec [cmd...]')

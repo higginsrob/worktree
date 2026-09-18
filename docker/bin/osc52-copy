@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Relay stdin to the real (host) terminal clipboard via an OSC 52 escape
+# sequence, over the docker exec -it PTY. Wired into tmux copy-mode / vim
+# yanks in milestone 6.
+set -euo pipefail
+
+data=$(cat | base64 | tr -d '\n')
+printf '\033]52;c;%s\a' "$data" > /dev/tty

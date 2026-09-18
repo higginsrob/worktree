@@ -1,4 +1,4 @@
-import { execFile } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
@@ -6,6 +6,14 @@ const execFileAsync = promisify(execFile);
 async function git(cwd: string, args: string[]): Promise<string> {
   const { stdout } = await execFileAsync('git', args, { cwd });
   return stdout.trim();
+}
+
+export function gitInherit(cwd: string, args: string[]): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const child = spawn('git', args, { cwd, stdio: 'inherit' });
+    child.on('error', reject);
+    child.on('exit', (code) => resolve(code ?? 1));
+  });
 }
 
 export async function isGitAvailable(): Promise<boolean> {
@@ -101,7 +109,31 @@ export async function getUserIdentity(cwd: string): Promise<GitIdentity> {
   return { name, email };
 }
 
-// Stub — implemented in milestone 4 (sync & promote).
-export async function promoteCommits(..._args: unknown[]): Promise<never> {
-  throw new Error('not implemented yet');
+export async function revParse(cwd: string, rev: string): Promise<string> {
+  return git(cwd, ['rev-parse', rev]);
+}
+
+export async function fetchRef(repoRoot: string, source: string, refspec: string): Promise<void> {
+  await git(repoRoot, ['fetch', source, refspec]);
+}
+
+// Git refuses to fetch/push directly into a ref checked out in a worktree,
+// so promote fetches into a scratch ref first, then fast-forwards the
+// worktree's checked-out branch onto it from inside that worktree — the
+// same pattern `git pull` uses internally.
+export async function fastForwardWorktree(worktreePath: string, ref: string): Promise<void> {
+  await git(worktreePath, ['merge', '--ff-only', ref]);
+}
+
+export async function deleteRef(repoRoot: string, ref: string): Promise<void> {
+  await git(repoRoot, ['update-ref', '-d', ref]);
+}
+
+export async function hasUpstream(worktreePath: string): Promise<boolean> {
+  try {
+    await git(worktreePath, ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{u}']);
+    return true;
+  } catch {
+    return false;
+  }
 }

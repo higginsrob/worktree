@@ -1,4 +1,5 @@
 import fs from 'node:fs/promises';
+import os from 'node:os';
 import path from 'node:path';
 import {
   getRepoRoot,
@@ -8,6 +9,12 @@ import {
   worktreeAdd,
   worktreeRemove,
   getUserIdentity,
+  revParse,
+  fetchRef,
+  fastForwardWorktree,
+  deleteRef,
+  hasUpstream,
+  gitInherit,
 } from './git.js';
 import {
   volumeExists,
@@ -21,10 +28,20 @@ import {
   attachTmux,
   volumeSize,
   imageExists,
+  syncVolumeToHost,
+  createPromoteBundle,
   type ContainerState,
 } from './docker.js';
 import { volumeName, containerName, worktreeName, WORKTREES_DIR, HOME_VOLUME } from './config.js';
-import { readState, writeState, type WorktreeRecord } from './state.js';
+import { readState, writeState, type WktState, type WorktreeRecord } from './state.js';
+
+function getRecord(state: WktState, name: string): WorktreeRecord {
+  const record = state.worktrees[name];
+  if (!record) {
+    throw new Error(`no worktree named "${name}" — run "wkt add <branch>" first`);
+  }
+  return record;
+}
 
 export interface RepoContext {
   root: string;
@@ -147,10 +164,7 @@ export interface OpenOptions extends CreateOptions {
 
 export async function openWorktree(name: string, opts: OpenOptions = {}): Promise<WorktreeRecord> {
   const state = await readState();
-  const record = state.worktrees[name];
-  if (!record) {
-    throw new Error(`no worktree named "${name}" — run "wkt add <branch>" first`);
-  }
+  const record = getRecord(state, name);
 
   const status = await containerState(record.container);
   if (status === 'absent') {
@@ -204,10 +218,7 @@ export async function listWorktrees(opts: { all?: boolean } = {}): Promise<ListE
 
 export async function removeWorktree(name: string): Promise<void> {
   const state = await readState();
-  const record = state.worktrees[name];
-  if (!record) {
-    throw new Error(`no worktree named "${name}"`);
-  }
+  const record = getRecord(state, name);
 
   await removeContainer(record.container).catch(() => undefined);
   await removeVolume(record.volume).catch(() => undefined);
@@ -215,4 +226,104 @@ export async function removeWorktree(name: string): Promise<void> {
 
   delete state.worktrees[name];
   await writeState(state);
+}
+
+export interface SyncOptions {
+  dryRun?: boolean;
+  delete?: boolean;
+}
+
+export async function syncWorktree(name: string, opts: SyncOptions = {}): Promise<string> {
+  const state = await readState();
+  const record = getRecord(state, name);
+  return syncVolumeToHost({
+    volume: record.volume,
+    hostWorktreePath: record.worktreePath,
+    dryRun: opts.dryRun,
+    delete: opts.delete,
+  });
+}
+
+export type PromoteResult = 'created' | 'up-to-date';
+
+export async function promoteWorktree(name: string): Promise<PromoteResult> {
+  const state = await readState();
+  const record = getRecord(state, name);
+
+  const hostTip = await revParse(record.repoRoot, record.branch);
+  const bundleDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wkt-bundle-'));
+  const scratchRef = `refs/wkt/promote/${record.branch}`;
+  try {
+    const result = await createPromoteBundle({
+      volume: record.volume,
+      branch: record.branch,
+      hostTip,
+      bundleHostDir: bundleDir,
+    });
+    if (result === 'up-to-date') {
+      return result;
+    }
+    const bundlePath = path.join(bundleDir, 'promote.bundle');
+    await fetchRef(record.repoRoot, bundlePath, `${record.branch}:${scratchRef}`);
+    await fastForwardWorktree(record.worktreePath, scratchRef);
+    return result;
+  } finally {
+    await deleteRef(record.repoRoot, scratchRef).catch(() => undefined);
+    await fs.rm(bundleDir, { recursive: true, force: true });
+  }
+}
+
+export async function pushWorktree(name: string): Promise<number> {
+  const state = await readState();
+  const record = getRecord(state, name);
+  await promoteWorktree(name);
+  const upstream = await hasUpstream(record.worktreePath);
+  return gitInherit(
+    record.worktreePath,
+    upstream ? ['push'] : ['push', '-u', 'origin', record.branch],
+  );
+}
+
+export async function pullWorktree(name: string): Promise<number> {
+  const state = await readState();
+  const record = getRecord(state, name);
+  return gitInherit(record.worktreePath, ['pull']);
+}
+
+export async function fetchWorktree(name: string): Promise<number> {
+  const state = await readState();
+  const record = getRecord(state, name);
+  return gitInherit(record.worktreePath, ['fetch']);
+}
+
+export async function statusWorktree(name: string): Promise<number> {
+  const state = await readState();
+  const record = getRecord(state, name);
+  return gitInherit(record.worktreePath, ['status']);
+}
+
+// Destructive: discards any container-only work (uncommitted or
+// unpromoted) by re-seeding the volume from the host worktree's repo.
+export async function resetWorktree(name: string): Promise<void> {
+  const state = await readState();
+  const record = getRecord(state, name);
+
+  const originUrl = sanitizeRemoteUrl(await getOriginUrl(record.repoRoot));
+
+  await removeContainer(record.container).catch(() => undefined);
+  await removeVolume(record.volume).catch(() => undefined);
+
+  await createVolume(record.volume);
+  try {
+    await seedSanitizedClone({
+      hostRepoRoot: record.repoRoot,
+      volume: record.volume,
+      branch: record.branch,
+      originUrl,
+    });
+    await createContainerFor(record, {});
+  } catch (err) {
+    await removeVolume(record.volume).catch(() => undefined);
+    throw err;
+  }
 }

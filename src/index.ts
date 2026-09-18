@@ -6,6 +6,15 @@ import { addAction } from './commands/add.js';
 import { openAction } from './commands/open.js';
 import { listAction } from './commands/list.js';
 import { rmAction } from './commands/rm.js';
+import { syncAction } from './commands/sync.js';
+import {
+  promoteAction,
+  pushAction,
+  pullAction,
+  fetchAction,
+  statusAction,
+} from './commands/git.js';
+import { resetAction } from './commands/reset.js';
 import { notImplemented } from './commands/stub.js';
 
 const program = new Command();
@@ -43,40 +52,37 @@ program
   .option('--dry-run', 'show what would change without syncing')
   .option('--delete', 'delete files on the host that were removed in the volume')
   .option('--yes', 'skip confirmation')
-  .action(notImplemented('sync'));
+  .action(syncAction);
 
 const gitCmd = program.command('git').description('git operations scoped to a worktree');
 
 gitCmd
   .command('promote [name]')
   .description('bundle in-container commits → fetch onto host worktree')
-  .action(notImplemented('git promote'));
+  .action(promoteAction);
 
-gitCmd
-  .command('push [name]')
-  .description('promote, then git push on host')
-  .action(notImplemented('git push'));
+gitCmd.command('push [name]').description('promote, then git push on host').action(pushAction);
 
 gitCmd
   .command('pull [name]')
   .description('ordinary host git pull scoped to that worktree')
-  .action(notImplemented('git pull'));
+  .action(pullAction);
 
 gitCmd
   .command('fetch [name]')
   .description('ordinary host git fetch scoped to that worktree')
-  .action(notImplemented('git fetch'));
+  .action(fetchAction);
 
 gitCmd
   .command('status [name]')
   .description('ordinary host git status scoped to that worktree')
-  .action(notImplemented('git status'));
+  .action(statusAction);
 
 program
   .command('reset [name]')
   .description('host worktree → volume (re-seed, re-clone sanitized .git)')
   .option('--yes', 'skip confirmation')
-  .action(notImplemented('reset'));
+  .action(resetAction);
 
 program
   .command('reset-home')

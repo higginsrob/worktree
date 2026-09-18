@@ -204,6 +204,85 @@ chown -R 1000:1000 /dest
   ]);
 }
 
+export interface SyncOptions {
+  volume: string;
+  hostWorktreePath: string;
+  dryRun?: boolean;
+  delete?: boolean;
+  image?: string;
+}
+
+// Copies working-tree files (never .git) from the project volume onto the
+// host worktree path, so the host side reflects what's inside the container.
+export async function syncVolumeToHost(opts: SyncOptions): Promise<string> {
+  const rsyncArgs = ['-a', '-i', '--exclude=.git'];
+  if (opts.dryRun) {
+    rsyncArgs.push('--dry-run');
+  }
+  if (opts.delete) {
+    rsyncArgs.push('--delete');
+  }
+  rsyncArgs.push('/src/', '/dest/');
+  return run([
+    'run',
+    '--rm',
+    '-v',
+    `${opts.volume}:/src:ro`,
+    '-v',
+    `${opts.hostWorktreePath}:/dest`,
+    opts.image ?? IMAGE_NAME,
+    'rsync',
+    ...rsyncArgs,
+  ]);
+}
+
+export interface PromoteBundleOptions {
+  volume: string;
+  branch: string;
+  hostTip: string;
+  bundleHostDir: string;
+  image?: string;
+}
+
+export type PromoteBundleResult = 'created' | 'up-to-date';
+
+// Bundles commits reachable from `branch` inside the volume's clone, but not
+// yet reachable from `hostTip`, into promote.bundle under bundleHostDir.
+export async function createPromoteBundle(
+  opts: PromoteBundleOptions,
+): Promise<PromoteBundleResult> {
+  const script = `
+set -e
+cd /src
+if git bundle create /out/promote.bundle "$1..$2" 2>/tmp/bundle.err; then
+  echo CREATED
+else
+  if grep -q "Refusing to create empty bundle" /tmp/bundle.err; then
+    echo UP_TO_DATE
+  else
+    cat /tmp/bundle.err >&2
+    exit 1
+  fi
+fi
+`;
+  const out = await run([
+    'run',
+    '--rm',
+    '-v',
+    `${opts.volume}:/src:ro`,
+    '-v',
+    `${opts.bundleHostDir}:/out`,
+    opts.image ?? IMAGE_NAME,
+    'sh',
+    '-c',
+    script,
+    'sh',
+    opts.hostTip,
+    opts.branch,
+  ]);
+  return out.trim() === 'UP_TO_DATE' ? 'up-to-date' : 'created';
+}
+
 export async function pullImage(tag: string = IMAGE_NAME): Promise<void> {
   const code = await runInherit(['pull', tag]);
   if (code !== 0) {

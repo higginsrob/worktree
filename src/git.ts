@@ -3,6 +3,11 @@ import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
 
+async function git(cwd: string, args: string[]): Promise<string> {
+  const { stdout } = await execFileAsync('git', args, { cwd });
+  return stdout.trim();
+}
+
 export async function isGitAvailable(): Promise<boolean> {
   try {
     await execFileAsync('git', ['--version']);
@@ -21,15 +26,82 @@ export async function gitVersion(): Promise<string | undefined> {
   }
 }
 
-// Stubs — implemented in milestone 3 (lifecycle) / 4 (sync & promote).
-export async function addWorktree(..._args: unknown[]): Promise<never> {
-  throw new Error('not implemented yet');
+export async function getRepoRoot(cwd: string): Promise<string> {
+  return git(cwd, ['rev-parse', '--show-toplevel']);
 }
 
-export async function seedSanitizedClone(..._args: unknown[]): Promise<never> {
-  throw new Error('not implemented yet');
+export async function getOriginUrl(cwd: string): Promise<string> {
+  try {
+    return await git(cwd, ['remote', 'get-url', 'origin']);
+  } catch {
+    throw new Error('no "origin" remote configured for this repository');
+  }
 }
 
+export interface OrgRepo {
+  org: string;
+  repo: string;
+}
+
+// Handles git@host:org/repo.git, ssh://git@host/org/repo.git,
+// https://[user[:token]@]host/org/repo.git, and local paths ending in org/repo.
+export function parseOrgRepo(url: string): OrgRepo {
+  const stripped = url.replace(/\.git$/, '');
+  const scpMatch = /^[^@/]+@[^:/]+:(.+)$/.exec(stripped);
+  const pathPart = scpMatch ? scpMatch[1] : stripped.replace(/^[a-z][a-z0-9+.-]*:\/\/[^/]+\//i, '');
+  const segments = pathPart.split('/').filter(Boolean);
+  if (segments.length < 2) {
+    throw new Error(`could not determine org/repo from remote URL: ${url}`);
+  }
+  const repo = segments.at(-1)!;
+  const org = segments.at(-2)!;
+  return { org, repo };
+}
+
+// Strips embedded userinfo (e.g. an access token) from an HTTPS remote URL.
+export function sanitizeRemoteUrl(url: string): string {
+  return url.replace(/^([a-z][a-z0-9+.-]*:\/\/)[^@/]+@/i, '$1');
+}
+
+export async function branchExists(cwd: string, branch: string): Promise<boolean> {
+  try {
+    await git(cwd, ['rev-parse', '--verify', '--quiet', `refs/heads/${branch}`]);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function worktreeAdd(
+  repoRoot: string,
+  worktreePath: string,
+  branch: string,
+): Promise<void> {
+  const exists = await branchExists(repoRoot, branch);
+  const args = exists
+    ? ['worktree', 'add', worktreePath, branch]
+    : ['worktree', 'add', '-b', branch, worktreePath];
+  await git(repoRoot, args);
+}
+
+export async function worktreeRemove(repoRoot: string, worktreePath: string): Promise<void> {
+  await git(repoRoot, ['worktree', 'remove', '--force', worktreePath]);
+}
+
+export interface GitIdentity {
+  name?: string;
+  email?: string;
+}
+
+export async function getUserIdentity(cwd: string): Promise<GitIdentity> {
+  const [name, email] = await Promise.all([
+    git(cwd, ['config', 'user.name']).catch(() => undefined),
+    git(cwd, ['config', 'user.email']).catch(() => undefined),
+  ]);
+  return { name, email };
+}
+
+// Stub — implemented in milestone 4 (sync & promote).
 export async function promoteCommits(..._args: unknown[]): Promise<never> {
   throw new Error('not implemented yet');
 }

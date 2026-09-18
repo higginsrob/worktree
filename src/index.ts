@@ -2,6 +2,10 @@
 import { Command } from 'commander';
 import { doctorAction } from './commands/doctor.js';
 import { buildImageAction } from './commands/build-image.js';
+import { addAction } from './commands/add.js';
+import { openAction } from './commands/open.js';
+import { listAction } from './commands/list.js';
+import { rmAction } from './commands/rm.js';
 import { notImplemented } from './commands/stub.js';
 
 const program = new Command();
@@ -14,7 +18,7 @@ program
 program
   .command('add <branch>')
   .description('git worktree add + volume + container + tmux session (creates + opens)')
-  .action(notImplemented('add'));
+  .action(addAction);
 
 program
   .command('open [name]')
@@ -22,20 +26,16 @@ program
   .option('--no-create', "fail instead of creating if the volume doesn't exist")
   .option('--pull', 'check the image digest on Docker Hub before starting')
   .option('--rebuild', 'rebuild the local devcontainer image from docker/Dockerfile')
-  .option(
-    '-p, --port, --publish <spec>',
-    'publish ports (docker run -p semantics, repeatable)',
-    collect,
-    [],
-  )
+  .option('-p, --port <spec>', 'publish ports (docker run -p semantics, repeatable)', collect, [])
+  .option('--publish <spec>', 'alias for --port', collect, [])
   .option('--host', '--network=host')
-  .action(notImplemented('open'));
+  .action(openAction);
 
 program
   .command('list')
   .description('table: name, branch, container status, volume size, last synced')
   .option('--all', 'include stopped/orphaned entries')
-  .action(notImplemented('list'));
+  .action(listAction);
 
 program
   .command('sync [name]')
@@ -88,7 +88,7 @@ program
   .command('rm <name>')
   .description('remove container + volume (+ managed git worktree if wkt created it)')
   .option('--yes', 'skip confirmation')
-  .action(notImplemented('rm'));
+  .action(rmAction);
 
 program
   .command('clean')

@@ -7,6 +7,7 @@ export interface WorktreeRecord {
   org: string;
   repo: string;
   branch: string;
+  repoRoot: string;
   worktreePath: string;
   volume: string;
   container: string;

@@ -89,7 +89,18 @@ export async function worktreeAdd(
   const args = exists
     ? ['worktree', 'add', worktreePath, branch]
     : ['worktree', 'add', '-b', branch, worktreePath];
-  await git(repoRoot, args);
+  try {
+    await git(repoRoot, args);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (message.includes('is already used by worktree')) {
+      throw new Error(
+        `branch "${branch}" is already checked out elsewhere (often the repo itself) — ` +
+          'check out a different branch there first, or use a different branch name',
+      );
+    }
+    throw err;
+  }
 }
 
 export async function worktreeRemove(repoRoot: string, worktreePath: string): Promise<void> {

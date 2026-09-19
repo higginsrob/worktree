@@ -1,11 +1,28 @@
-" wkt vim config (system-wide: /etc/vim/vimrc.local).
+" wkt vim config. Loaded two ways: as /etc/vim/vimrc.local inside the
+" sandbox container (sourced by Debian's system vimrc), or explicitly via
+" `vim -u <this file>` on the host — see attachHostTmux in src/host.ts. `-u`
+" only replaces which vimrc is sourced; it does not disable the automatic
+" pack/*/start plugin loading below (only `-u NONE`/`--noplugin` do), so
+" this file works unmodified in both places.
 
 syntax on
 filetype plugin indent on
 
+" On the host there's no system-wide plugin install, so $WKT_VIM_RUNTIME_DIR
+" (set only for host mode) points at a wkt-owned runtime dir with the same
+" plugins cloned into pack/plugins/start (see ensureVimRuntime in
+" src/host.ts). The sandbox container never sets this — its plugins are
+" already reachable via Debian's default /usr/share/vim/vimfiles packpath
+" entry, baked in at image build time.
+if !empty($WKT_VIM_RUNTIME_DIR)
+  let &packpath = &packpath . ',' . $WKT_VIM_RUNTIME_DIR
+  let &runtimepath = &runtimepath . ',' . $WKT_VIM_RUNTIME_DIR
+endif
+
 set nocompatible
 set number
-set relativenumber
+" set relativenumber
+set nowrap
 set expandtab
 set shiftwidth=2
 set tabstop=2
@@ -17,13 +34,80 @@ set hlsearch
 set ignorecase
 set smartcase
 set mouse=a
+" xterm2 mouse encoding (vim's fallback default in some tmux/$TERM
+" combos) can't distinguish a drag's motion events from repeated clicks,
+" so single clicks (e.g. netrw) work but dragging a split border to
+" resize it doesn't. SGR encodes button state and motion unambiguously.
+if exists('&ttymouse')
+  set ttymouse=sgr
+endif
 set scrolloff=4
 set wildmenu
 set laststatus=2
 set backspace=indent,eol,start
 set updatetime=300
+" New splits open below/right of the current window instead of above/left.
+set splitbelow
+set splitright
 
-" vim-fugitive is bundled at build time — :Git, :Gdiffsplit, etc.
+" Plugins are bundled at build time as native vim8 packages (no plugin
+" manager, no runtime network access needed inside the read-only container):
+" vim-fugitive (:Git, :Gdiffsplit, ...), vim-commentary (gcc/gc), fzf + fzf.vim
+" (:Files, :Buffers, :Rg, :Lines, :History), vim-tmux-navigator (Ctrl-hjkl
+" pane nav, see tmux.conf), syntax packs for JS/TS/JSX/Markdown/YAML/TOML,
+" and the tokyonight colorscheme.
+
+let g:vim_markdown_folding_disabled = 1
+
+" --- Leader key ----------------------------------------------------------
+let mapleader = " "
+nnoremap <leader>q :q<CR>
+nnoremap <leader>x :qa!<CR>
+" t/c open a tmux pane (side-by-side / stacked) in vim's cwd, not a vim terminal.
+nnoremap <silent> <leader>t :call system('tmux split-window -h -c ' . shellescape(getcwd()))<CR>
+nnoremap <silent> <leader>c :call system('tmux split-window -v -c ' . shellescape(getcwd()))<CR>
+" Focus an already-open netrw window if there is one, else browse cwd here.
+function! s:WktFocusNetrw() abort
+  for l:w in range(1, winnr('$'))
+    if getwinvar(l:w, '&filetype') ==# 'netrw'
+      execute l:w . 'wincmd w'
+      return
+    endif
+  endfor
+  edit .
+endfunction
+nnoremap <silent> <leader>e :call <SID>WktFocusNetrw()<CR>
+nnoremap <leader>v :vsplit<CR>
+nnoremap <leader>h :split<CR>
+nnoremap <silent> <leader>a :call system('tmux split-window -h -c ' . shellescape(getcwd()) . ' claude')<CR>
+
+" Persistent undo/viminfo so history survives container restarts across
+" `wkt open` reattaches ($HOME is a persistent volume). Falls back to /tmp
+" if the home volume isn't writable yet.
+let s:undodir = expand('~/.vim/undo')
+if !isdirectory(s:undodir)
+  call mkdir(s:undodir, 'p', 0700)
+endif
+if filewritable(s:undodir) != 2
+  let s:undodir = '/tmp/wkt-undo'
+  if !isdirectory(s:undodir)
+    call mkdir(s:undodir, 'p', 0700)
+  endif
+endif
+let &undodir = s:undodir
+set undofile
+
+let s:viminfo_dir = expand('~/.local/share/vim')
+if !isdirectory(s:viminfo_dir)
+  silent! call mkdir(s:viminfo_dir, 'p')
+endif
+if filewritable(s:viminfo_dir) != 2
+  let s:viminfo_dir = '/tmp/wkt-viminfo'
+  if !isdirectory(s:viminfo_dir)
+    call mkdir(s:viminfo_dir, 'p', 0700)
+  endif
+endif
+let &viminfofile = s:viminfo_dir . '/viminfo'
 
 " OSC 52 clipboard passthrough: yanks reach the host terminal's real
 " clipboard over the docker exec -it PTY, same mechanism as tmux copy-mode.
@@ -33,3 +117,148 @@ if has('autocmd')
     autocmd TextYankPost * if v:event.operator ==# 'y' | call system('osc52-copy', getreg(v:event.regname)) | endif
   augroup END
 endif
+
+" --- netrw: banner + open target follow the window width ------------------
+" g:netrw_banner is global and read each time netrw draws a listing, so set
+" it from the current window's width right before a draw (FileType), and
+" re-draw netrw windows whose banner state is stale after a resize.
+function! s:WktNetrwBanner() abort
+  return winwidth(0) >= 80
+endfunction
+
+function! s:WktNetrwSync() abort
+  let l:want = s:WktNetrwBanner()
+  " Wide: open files in this window, or, on a terminal wider than 120 cols,
+  " in a vertical split (2) that WktNetrwShrink then squeezes netrw out of.
+  " Narrow (a sidebar): open them in the previous window (4) so the sidebar
+  " stays put.
+  let g:netrw_browse_split = l:want ? (&columns > 120 ? 2 : 0) : 4
+  if get(g:, 'netrw_banner', 1) != l:want
+    let g:netrw_banner = l:want
+    return 1
+  endif
+  return 0
+endfunction
+
+function! s:WktNetrwResize() abort
+  let l:cur = win_getid()
+  for l:w in range(1, winnr('$'))
+    if getwinvar(l:w, '&filetype') !=# 'netrw'
+      continue
+    endif
+    noautocmd call win_gotoid(win_getid(l:w))
+    if s:WktNetrwSync()
+      silent! execute "normal \<Plug>NetrwRefresh"
+    endif
+  endfor
+  noautocmd call win_gotoid(l:cur)
+  " WinResized fires after vim has already drawn; without this the refreshed
+  " buffer isn't painted until the next focus change.
+  redraw
+endfunction
+
+" After netrw opens a file in a vertical split, shrink netrw to a 16-col
+" sidebar and let the new window keep the rest. The resize then drops netrw
+" into narrow mode (no banner, files open in the previous window).
+function! s:WktNetrwShrink() abort
+  if g:netrw_browse_split != 2 || &filetype ==# 'netrw'
+    return
+  endif
+  let l:ids = []
+  for l:w in range(1, winnr('$'))
+    if getwinvar(l:w, '&filetype') ==# 'netrw' && winwidth(l:w) > 16
+      call add(l:ids, win_getid(l:w))
+    endif
+  endfor
+  " Flip netrw to narrow mode now instead of waiting for WinResized. The
+  " refresh this may trigger can undo a resize, so resize afterwards.
+  call s:WktNetrwResize()
+  for l:id in l:ids
+    " Keep the sidebar on the left regardless of which side netrw split to.
+    call win_execute(l:id, 'wincmd H | vertical resize 16')
+  endfor
+endfunction
+
+let g:netrw_banner = 1
+let g:netrw_browse_split = 0
+augroup wkt_netrw_banner
+  autocmd!
+  autocmd FileType netrw call s:WktNetrwSync()
+  autocmd BufWinEnter * call timer_start(0, {-> s:WktNetrwShrink()})
+  if exists('##WinResized')
+    autocmd WinResized * call s:WktNetrwResize()
+    " Also fires for size changes; covers a WinResized that is skipped
+    " while a mouse drag is still in progress.
+    autocmd WinScrolled * call s:WktNetrwResize()
+  else
+    autocmd VimResized * call s:WktNetrwResize()
+  endif
+augroup END
+
+" --- Theme -------------------------------------------------------------
+" vim always runs inside tmux here (see session-created hook above). tmux's
+" own terminal-overrides advertise RGB support to apps running inside it,
+" but vim separately needs to know ITS $TERM (tmux-256color) can take 24-bit
+" escapes, or termguicolors emits colors the terminal misreads — the exact
+" cause of the "dark text on dark background" glitch. t_8f/t_8b spell that
+" out explicitly instead of relying on terminfo having it.
+if &term =~# '^\(tmux\|screen\)'
+  let &t_8f = "\<Esc>[38;2;%lu;%lu;%lum"
+  let &t_8b = "\<Esc>[48;2;%lu;%lu;%lum"
+endif
+if has('termguicolors')
+  set termguicolors
+endif
+" Belt-and-suspenders: if the colorscheme below ever fails to load, vim's
+" built-in default colors still assume a dark terminal instead of picking
+" light-mode foregrounds that are unreadable on our dark background.
+set background=dark
+let g:tokyonight_style = 'night'
+let g:tokyonight_enable_italic = 1
+" Let the terminal's own background show through instead of forcing
+" tokyonight's navy fill behind the text.
+let g:tokyonight_transparent_background = 1
+silent! colorscheme tokyonight
+
+hi clear SpellBad
+hi SpellBad cterm=underline ctermfg=black ctermbg=yellow gui=undercurl guifg=#000000 guibg=#d79921
+" Pane split "drag handle": a solid dark-gray bar, not the default piped
+" character (renders as a dashed line in some terminal fonts). Set via a
+" quoted string, not `set fillchars+=vert:\ ` — a trailing backslash-space
+" is too easy to lose to whitespace trimming, which leaves the fillchar as
+" a literal backslash instead of a space.
+let &fillchars = (empty(&fillchars) ? '' : &fillchars . ',') . 'vert: '
+" Same color as the active statusline background (tokyonight night bg3).
+highlight VertSplit ctermfg=237 ctermbg=237 guifg=#32344a guibg=#32344a
+highlight WktFileType ctermfg=234 ctermbg=111 guifg=#1a1b26 guibg=#7aa2f7 gui=bold cterm=bold
+highlight WktFileTypeNC ctermfg=103 ctermbg=236 guifg=#565f89 guibg=#24283b gui=NONE cterm=NONE
+
+function! s:WktDiffColors() abort
+  highlight clear DiffAdd
+  highlight clear DiffChange
+  highlight clear DiffDelete
+  highlight clear DiffText
+  highlight! DiffAdd    guifg=NONE guibg=#1e332a ctermfg=NONE ctermbg=22 gui=NONE cterm=NONE
+  highlight! DiffDelete guifg=#565f89 guibg=#2a1f26 ctermfg=59 ctermbg=52 gui=NONE cterm=NONE
+  highlight! DiffChange guifg=NONE guibg=#252a41 ctermfg=NONE ctermbg=17 gui=NONE cterm=NONE
+  highlight! DiffText   guifg=NONE guibg=#3d4a6b ctermfg=NONE ctermbg=19 gui=NONE cterm=NONE
+endfunction
+call s:WktDiffColors()
+
+augroup wkt_diff_ui
+  autocmd!
+  autocmd ColorScheme * call s:WktDiffColors()
+augroup END
+
+" --- Statusline: filename + a filetype badge, dimmed when inactive -----
+function! WktStatusline() abort
+  let l:winid = get(g:, 'statusline_winid', win_getid())
+  let l:active = l:winid == get(g:, 'actual_curwin', win_getid())
+  let l:bufnr = winbufnr(l:winid)
+  let l:ft = getbufvar(l:bufnr, '&filetype')
+  let l:label = empty(l:ft) ? ' none ' : ' ' . l:ft . ' '
+  let l:hl = l:active ? '%#WktFileType#' : '%#WktFileTypeNC#'
+  let l:end = l:active ? '%#StatusLine#' : '%#StatusLineNC#'
+  return ' %f%=' . l:hl . l:label . l:end
+endfunction
+set statusline=%!WktStatusline()

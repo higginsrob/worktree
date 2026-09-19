@@ -1,9 +1,17 @@
 # Security & isolation
 
-`worktree` is built around the assumption that whatever runs inside a container —
-agent CLIs, build scripts, anything a project's dependencies pull in — should never
-be able to reach outside its own project, escalate privileges, or push code
-anywhere on its own.
+Everything below describes `--sandbox` worktrees only. **Host-mode worktrees
+(the default) have none of these guarantees** — a host worktree is just a
+`git worktree` plus a plain tmux session running as you, with your own git
+credentials, your own filesystem access, same trust level as running `vim`/
+`tmux` yourself. Reach for `--sandbox` when you want to run something you
+don't fully trust (an AI agent, unfamiliar build tooling, a project's
+postinstall scripts).
+
+`worktree --sandbox` is built around the assumption that whatever runs inside a
+container — agent CLIs, build scripts, anything a project's dependencies pull
+in — should never be able to reach outside its own project, escalate
+privileges, or push code anywhere on its own.
 
 ## Container hardening
 

@@ -4,9 +4,19 @@
 # live here (those are host-only `wkt` commands).
 set -u
 
-repo_dir=$(printf '%s\n' /workspace/*/ 2>/dev/null | head -n1)
+FG_DARK="#1a1b26"
+
+# $WKT_WORKSPACE_DIR is set by the host CLI for both sandbox containers and
+# host tmux sessions; the /workspace glob is a fallback for older images.
+# Statusline #() jobs run with the tmux server's env, shared by every session,
+# so prefer the session's own value (session name passed as $1).
+repo_dir=""
+if [ -n "${1:-}" ]; then
+  repo_dir=$(tmux show-environment -t "$1" WKT_WORKSPACE_DIR 2>/dev/null | sed -n 's/^WKT_WORKSPACE_DIR=//p')
+fi
+repo_dir="${repo_dir:-${WKT_WORKSPACE_DIR:-$(printf '%s\n' /workspace/*/ 2>/dev/null | head -n1)}}"
 if [ -z "$repo_dir" ] || ! git -C "$repo_dir" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  echo "#[fg=colour8]no-repo#[fg=default]"
+  echo "#[fg=${FG_DARK},bg=#565f89,bold] no-repo #[default]"
   exit 0
 fi
 
@@ -25,17 +35,17 @@ if git -C "$repo_dir" rev-parse --verify --quiet '@{u}' >/dev/null 2>&1; then
 fi
 
 if [ -n "$dirty" ] && { [ "$ahead" != "0" ] || [ "$behind" != "0" ]; }; then
-  color=colour1 # red: dirty + diverged
+  color="#f7768e" # red: dirty + diverged
 elif [ -n "$dirty" ]; then
-  color=colour1 # red: dirty
+  color="#f7768e" # red: dirty
 elif [ "$ahead" != "0" ] && [ "$behind" != "0" ]; then
-  color=colour5 # magenta: diverged
+  color="#bb9af7" # magenta: diverged
 elif [ "$ahead" != "0" ]; then
-  color=colour6 # cyan: ahead
+  color="#7dcfff" # cyan: ahead
 elif [ "$behind" != "0" ]; then
-  color=colour3 # yellow: behind
+  color="#e0af68" # yellow: behind
 else
-  color=colour2 # green: clean
+  color="#9ece6a" # green: clean
 fi
 
-echo "#[fg=${color}]${branch}#[fg=default]"
+echo "#[fg=${FG_DARK},bg=${color},bold] ${branch} #[default]"

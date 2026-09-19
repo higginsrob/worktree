@@ -3,6 +3,7 @@ import { promisify } from 'node:util';
 import os from 'node:os';
 import { isDockerAvailable, dockerVersion } from '../docker.js';
 import { isGitAvailable, gitVersion } from '../git.js';
+import { isTmuxAvailable, tmuxVersion, isVimAvailable, vimVersion } from '../host.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -22,14 +23,27 @@ async function checkNode(): Promise<Check> {
   };
 }
 
+// Only required for `--sandbox` worktrees, so this doesn't gate `allOk`.
 async function checkDocker(): Promise<Check> {
   const ok = await isDockerAvailable();
   const version = ok ? await dockerVersion() : undefined;
   return {
-    name: 'docker',
+    name: 'docker (optional, needed for --sandbox)',
     ok,
     detail: ok ? (version ?? 'available') : 'not found or daemon unreachable',
   };
+}
+
+async function checkTmux(): Promise<Check> {
+  const ok = await isTmuxAvailable();
+  const version = ok ? await tmuxVersion() : undefined;
+  return { name: 'tmux', ok, detail: ok ? (version ?? 'available') : 'not found' };
+}
+
+async function checkVim(): Promise<Check> {
+  const ok = await isVimAvailable();
+  const version = ok ? await vimVersion() : undefined;
+  return { name: 'vim', ok, detail: ok ? (version ?? 'available') : 'not found' };
 }
 
 async function checkGit(): Promise<Check> {
@@ -53,14 +67,18 @@ async function checkDiskSpace(): Promise<Check> {
 }
 
 export async function doctorAction(): Promise<void> {
-  const checks = await Promise.all([checkNode(), checkDocker(), checkGit(), checkDiskSpace()]);
+  const [required, docker] = await Promise.all([
+    Promise.all([checkNode(), checkGit(), checkTmux(), checkVim(), checkDiskSpace()]),
+    checkDocker(),
+  ]);
 
   let allOk = true;
-  for (const check of checks) {
+  for (const check of required) {
     allOk &&= check.ok;
     const badge = check.ok ? 'OK' : 'FAIL';
     console.log(`[${badge}] ${check.name}: ${check.detail}`);
   }
+  console.log(`[${docker.ok ? 'OK' : 'WARN'}] ${docker.name}: ${docker.detail}`);
 
   if (!allOk) {
     process.exitCode = 1;

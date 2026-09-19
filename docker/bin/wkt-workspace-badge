@@ -1,17 +1,24 @@
 #!/usr/bin/env bash
 # Renders (or with --plain, returns unstyled) the tmux statusline WORKSPACE
-# badge: "org/repo · branch". Informational only — click copies this text.
+# badge: "org/repo". Informational only — click copies this text. The branch
+# lives in the separate GIT badge, so it isn't repeated here.
 set -u
 
-repo_dir=$(printf '%s\n' /workspace/*/ 2>/dev/null | head -n1)
-branch=$(git -C "$repo_dir" symbolic-ref --short HEAD 2>/dev/null)
-[ -z "$branch" ] && branch=$(git -C "$repo_dir" rev-parse --short HEAD 2>/dev/null)
+# All sessions share one tmux server, and statusline #() jobs run with the
+# server's env, not the session's — so look the value up by session name
+# ($2, or $1 when not --plain) rather than trusting $WKT_REPO_NAME.
+plain=""
+[ "${1:-}" = "--plain" ] && { plain=1; shift; }
+session="${1:-}"
 
-text="${WKT_REPO_NAME:-?}"
-[ -n "$branch" ] && text="${text} · ${branch}"
+text=""
+if [ -n "$session" ]; then
+  text=$(tmux show-environment -t "$session" WKT_REPO_NAME 2>/dev/null | sed -n 's/^WKT_REPO_NAME=//p')
+fi
+text="${text:-${WKT_REPO_NAME:-?}}"
 
-if [ "${1:-}" = "--plain" ]; then
+if [ -n "$plain" ]; then
   echo "$text"
 else
-  echo "#[fg=colour4]${text}#[fg=default]"
+  echo "#[fg=#1a1b26,bg=#7aa2f7,bold] ${text} #[default]"
 fi

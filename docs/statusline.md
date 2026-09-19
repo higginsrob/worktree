@@ -10,7 +10,7 @@ gives you tmux window controls and read-only repo status, nothing more.
 | **Window tabs** | `#I:#W`                                      | tmux's built-in window list — click to select                       |
 | **-** (yellow)  | Split horizontal                             | `split-window -v` in the current path                               |
 | **\|** (cyan)   | Split vertical                               | `split-window -h` in the current path                               |
-| **WORKSPACE**   | `org/repo · branch`                          | Informational — click copies it to your host clipboard (via OSC 52) |
+| **WORKSPACE**   | `org/repo`                                   | Informational — click copies it to your host clipboard (via OSC 52) |
 | **GIT**         | Current branch, colored by state (see below) | Opens a popup with `git status -sb`                                 |
 
 There are deliberately **no push/pull/sync actions in the statusline** — those stay
@@ -27,15 +27,17 @@ a UI affordance implying it could push on its own.
 | yellow  | behind upstream                  |
 | magenta | diverged (both ahead and behind) |
 
-The badge reads the repo under `/workspace/*`, refreshed every 5 seconds
-(`status-interval`).
+The badge reads the repo at `$WKT_WORKSPACE_DIR` (set by the host CLI for both
+sandbox containers and host tmux sessions — see [`editor.md`](editor.md)),
+refreshed every 5 seconds (`status-interval`).
 
 ## OSC 52 clipboard
 
 Both vim yanks and tmux copy-mode (keyboard `y` in copy-mode-vi, or releasing a
 mouse-drag selection) pipe the selected text through an OSC 52 escape sequence
-over the `docker exec -it` PTY, reaching your actual host terminal's clipboard —
-no `xclip`, no X11 forwarding, no host filesystem access needed.
+to `/dev/tty` — over the `docker exec -it` PTY in sandbox mode, or straight to
+your terminal in host mode — reaching your actual clipboard with no `xclip`,
+no X11 forwarding, no host filesystem access needed.
 
 ## Implementation
 

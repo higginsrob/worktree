@@ -17,35 +17,50 @@ import {
 import { resetAction } from './commands/reset.js';
 import { resetHomeAction } from './commands/reset-home.js';
 import { cleanAction } from './commands/clean.js';
+import { setupHostAction } from './commands/setup-host.js';
 import { notImplemented } from './commands/stub.js';
 
 const program = new Command();
 
 program
   .name('wkt')
-  .description('Locked-down, isolated Docker development environments built around git worktree.')
+  .description(
+    'git worktree sessions with a consistent tmux+vim environment — on the host by ' +
+      'default, sandboxed in an isolated Docker container with --sandbox.',
+  )
   .version('0.1.0');
 
 program
   .command('add <branch>')
-  .description('git worktree add + volume + container + tmux session (creates + opens)')
+  .description('git worktree add + tmux session (creates + opens); add --sandbox to run in Docker')
+  .option('--sandbox', 'run in an isolated Docker container instead of directly on the host')
   .action(addAction);
 
 program
   .command('open [name]')
-  .description('attach to an existing worktree (or create if missing)')
-  .option('--no-create', "fail instead of creating if the volume doesn't exist")
-  .option('--pull', 'check the image digest on Docker Hub before starting')
-  .option('--rebuild', 'rebuild the local devcontainer image from docker/Dockerfile')
-  .option('-p, --port <spec>', 'publish ports (docker run -p semantics, repeatable)', collect, [])
-  .option('--publish <spec>', 'alias for --port', collect, [])
-  .option('--host', '--network=host')
+  .description('attach to an existing worktree (recreating its sandbox container if missing)')
+  .option('--no-create', "fail instead of creating if the volume doesn't exist (--sandbox only)")
+  .option('--pull', 'check the image digest on Docker Hub before starting (--sandbox only)')
+  .option(
+    '--rebuild',
+    'rebuild the local devcontainer image from docker/Dockerfile (--sandbox only)',
+  )
+  .option(
+    '-p, --port <spec>',
+    'publish ports (docker run -p semantics, repeatable, --sandbox only)',
+    collect,
+    [],
+  )
+  .option('--publish <spec>', 'alias for --port (--sandbox only)', collect, [])
+  .option('--network-host', '--network=host (--sandbox only)')
   .action(openAction);
 
 program
   .command('list')
-  .description('table: name, branch, container status, volume size, last synced')
-  .option('--all', 'include stopped/orphaned entries')
+  .description(
+    'table: every tracked worktree (host/sandbox mode, running/not, size, last synced), ' +
+      "plus the current directory's worktree if it isn't tracked",
+  )
   .action(listAction);
 
 program
@@ -114,8 +129,13 @@ program
 
 program
   .command('build-image')
-  .description('build higginsrob/worktree:latest locally from docker/Dockerfile')
+  .description('build higginsrob/worktree:latest locally from docker/Dockerfile (--sandbox only)')
   .action(buildImageAction);
+
+program
+  .command('setup-host')
+  .description('pre-clone the bundled vim plugin set into the host vim runtime (one-time)')
+  .action(setupHostAction);
 
 program
   .command('exec [cmd...]')

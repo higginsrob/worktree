@@ -63,6 +63,7 @@ run:
 	docker run --rm -it \
 		--read-only --tmpfs /tmp --tmpfs /var/tmp \
 		--security-opt no-new-privileges \
+		-e WKT_VIMRC=/etc/vim/vimrc.local \
 		$(IMAGE) tmux new-session -A -s main
 
 .PHONY: pack

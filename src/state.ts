@@ -2,6 +2,8 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { CONFIG_DIR, STATE_FILE } from './config.js';
 
+export type WorktreeMode = 'host' | 'sandbox';
+
 export interface WorktreeRecord {
   name: string;
   org: string;
@@ -9,8 +11,9 @@ export interface WorktreeRecord {
   branch: string;
   repoRoot: string;
   worktreePath: string;
-  volume: string;
-  container: string;
+  mode: WorktreeMode;
+  volume?: string;
+  container?: string;
   createdAt: string;
   lastSyncedAt?: string;
 }
@@ -24,7 +27,13 @@ const EMPTY_STATE: WktState = { worktrees: {} };
 export async function readState(): Promise<WktState> {
   try {
     const raw = await fs.readFile(STATE_FILE, 'utf8');
-    return JSON.parse(raw) as WktState;
+    const state = JSON.parse(raw) as WktState;
+    // Migration: every record predating `mode` always had a container/volume
+    // (sandbox was the only option), so backfilling is unambiguous.
+    for (const record of Object.values(state.worktrees)) {
+      record.mode ??= 'sandbox';
+    }
+    return state;
   } catch (err) {
     if (isNotFound(err)) {
       return { ...EMPTY_STATE, worktrees: {} };

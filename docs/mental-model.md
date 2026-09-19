@@ -1,32 +1,51 @@
 # Mental model
 
-`worktree` collapses control-plane and data-plane into one place: **the container is
-both**. It's a fully self-contained, tmux+vim environment you attach to over
-`docker exec`. The host CLI (`wkt`) is deliberately thin:
+Every worktree is one of two modes, chosen at `wkt add` time and fixed for
+that worktree's lifetime:
+
+- **`host`** (the default): a real `git worktree` plus a plain host `tmux`
+  session running as you. No isolation, no extra moving parts — the fastest
+  path, and the right choice when you trust what you're about to run.
+- **`sandbox`** (`wkt add <branch> --sandbox`): the worktree's control-plane
+  and data-plane collapse into one place, **the container is both**. It's a
+  fully self-contained, tmux+vim environment you attach to over `docker exec`,
+  with no credentials or host filesystem access of its own — see
+  [`security.md`](security.md). This is the right choice for anything you
+  don't fully trust: an AI agent, unfamiliar build tooling, a project's own
+  postinstall scripts.
+
+Both modes get the identical tmux/vim environment (statusline badges,
+colorscheme, keybindings) — see [`editor.md`](editor.md) for how that's kept
+in sync without sandbox mode needing network access or host mode touching
+your personal dotfiles.
 
 ```
 Host (wkt CLI)
-  git worktree lifecycle, docker run/exec, sync, promote/push, list, clean
-  no tmux required on the host — attach is just `docker exec -it <container> tmux ...`
-  no SSH keys, no docker.sock inside any container, no credential helpers shared in
+  git worktree lifecycle, list, clean — same for every worktree
+  host mode:    tmux -f <shipped conf> new-session ...   (no Docker involved)
+  sandbox mode: docker run/exec, sync, promote/push       (this section)
 
-Container  (--read-only, no-new-privileges, unprivileged)
+Sandbox container  (--read-only, no-new-privileges, unprivileged)
   tmux server + vim + full toolchain, all interaction happens here
   sanitized credential-free git clone
   no docker.sock, no SSH, no access to any other project's volume
 ```
 
-## A worktree session is 1:1 with
+The rest of this document describes **sandbox mode**; a host-mode worktree is
+just item 1 below, on its own.
+
+## A sandbox worktree session is 1:1 with
 
 1. A real host `git worktree` path (`git worktree add`), under
-   `~/.local/share/wkt/worktrees/<org>/<repo>/<branch>`.
+   `~/.local/share/wkt/worktrees/<org>/<repo>/<branch>` — the same path host
+   mode uses, and the only thing a host-mode worktree has.
 2. A Docker named volume (`wkt-vol-<org>-<repo>-<branch>`) seeded with an independent,
    sanitized clone of your repo — not a copy of the host worktree's `.git`, which
    would just be a path reference back into the host's object store.
 3. A container mounting that volume at `/workspace/<repo>`, `--read-only`, running a
    persistent tmux server.
 4. A shared home volume (`wkt-home`), mounted at `$HOME`, shared across **every**
-   worktree and project — this is where global tool installs
+   sandbox worktree and project — this is where global tool installs
    (`npm install -g ...`) and dotfiles live.
 
 ## Why a Docker volume, not a bind mount

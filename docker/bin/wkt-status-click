@@ -4,24 +4,32 @@
 # so $1/$2 are already resolved by tmux before this script runs.
 set -u
 
-range="$1"
+# tmux >= 3.2 expands #{mouse_status_range} to just the argument after
+# "range=user|" (e.g. "new-window"), not "user|new-window".
+range="${1#user|}"
 pane_path="${2:-}"
+session="${3:-}"
 
 case "$range" in
-  user\|new-window)
+  new-window)
     tmux new-window -c "$pane_path"
     ;;
-  user\|split-h)
+  split-h)
     tmux split-window -h -c "$pane_path"
     ;;
-  user\|split-v)
+  split-v)
     tmux split-window -v -c "$pane_path"
     ;;
-  user\|workspace)
-    wkt-workspace-badge --plain | osc52-copy
+  workspace)
+    # Not "| osc52-copy": that script writes to /dev/tty, which doesn't
+    # exist for a run-shell job (no controlling terminal). set-buffer -w
+    # relays to the client's real terminal via tmux's own OSC 52 support
+    # (set-clipboard on, above) instead of a subprocess needing a tty.
+    tmux set-buffer -w -- "$(wkt-workspace-badge --plain "$session")"
     ;;
-  user\|git-status)
-    repo_dir=$(printf '%s\n' /workspace/*/ 2>/dev/null | head -n1)
+  git-status)
+    repo_dir=$(tmux show-environment -t "$session" WKT_WORKSPACE_DIR 2>/dev/null | sed -n 's/^WKT_WORKSPACE_DIR=//p')
+    repo_dir="${repo_dir:-${WKT_WORKSPACE_DIR:-$(printf '%s\n' /workspace/*/ 2>/dev/null | head -n1)}}"
     tmux display-popup -w 80% -h 60% -E "git -C '$repo_dir' status -sb 2>&1 | less"
     ;;
 esac

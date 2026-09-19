@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# Detaches from the tmux session on Ctrl-C then Ctrl-D within 1 second.
+# Bound from tmux.conf as:
+#   bind-key -n C-d run-shell -b "wkt-detach-check '#{session_name}' '#{pane_id}'"
+# Reads the same statefile wkt-doublec-check writes on Ctrl-C. Outside that
+# 1s window this isn't a detach combo, so the Ctrl-D is sent through to the
+# pane as normal (shell EOF, vim half-page scroll, etc).
+set -u
+
+session="${1:?session name required}"
+pane="${2:?pane id required}"
+statefile="/tmp/.wkt-doublec-${session}"
+now_ms=$(date +%s%3N)
+# See wkt-doublec-check: BSD/macOS date lacks %3N, so guard against a
+# non-numeric timestamp instead of risking broken arithmetic below.
+case "$now_ms" in '' | *[!0-9]*) now_ms= ;; esac
+
+last_ms=0
+[ -r "$statefile" ] && read -r last_ms < "$statefile"
+case "$last_ms" in '' | *[!0-9]*) last_ms=0 ;; esac
+
+if [ -n "$now_ms" ] && [ $((now_ms - last_ms)) -lt 1000 ]; then
+  rm -f "$statefile"
+  tmux detach-client -s "$session"
+else
+  tmux send-keys -t "$pane" C-d
+fi

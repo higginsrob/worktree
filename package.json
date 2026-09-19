@@ -1,7 +1,7 @@
 {
   "name": "@higginsrob/worktree",
   "version": "0.1.0",
-  "description": "Locked-down, isolated Docker development environments built around git worktree.",
+  "description": "git worktree sessions with a consistent tmux+vim environment, on the host by default or sandboxed in Docker.",
   "type": "module",
   "license": "MIT",
   "author": "Rob Higgins",

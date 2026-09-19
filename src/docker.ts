@@ -108,6 +108,24 @@ export async function stopContainer(name: string): Promise<void> {
   await run(['stop', name]);
 }
 
+// True while the container's tmux server still has a session (e.g. after a
+// detach, or another terminal is attached). `tmux ls` exits non-zero once the
+// last session is gone.
+export async function hasTmuxSession(containerName: string): Promise<boolean> {
+  try {
+    await run(['exec', containerName, 'tmux', 'ls']);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// PID 1 is `sleep infinity` and ignores SIGTERM, so don't wait out the
+// default 10s grace period.
+export async function stopContainerNow(name: string): Promise<void> {
+  await run(['stop', '-t', '1', name]);
+}
+
 export interface ContainerSummary {
   name: string;
   running: boolean;
@@ -163,6 +181,10 @@ export async function runContainer(opts: RunContainerOptions): Promise<void> {
   const args = [
     'run',
     '-d',
+    // Everything persistent lives in the volumes, so a stopped container has
+    // nothing worth keeping; removing it means the next open gets a fresh one
+    // built from the current image (and a fresh tmux server/config).
+    '--rm',
     '--name',
     opts.name,
     '--read-only',

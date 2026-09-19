@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# Prompts to kill the whole tmux session on two Ctrl-C presses within 1
+# second. Bound from tmux.conf as:
+#   bind-key -n C-c send-keys C-c \; run-shell -b "wkt-doublec-check '#{session_name}'"
+# so the first C-c still interrupts whatever's running in the pane as normal;
+# this just watches for a fast second press. The same statefile is also read
+# by wkt-detach-check, so a fast Ctrl-C then Ctrl-D detaches instead.
+set -u
+
+session="${1:?session name required}"
+statefile="/tmp/.wkt-doublec-${session}"
+now_ms=$(date +%s%3N)
+# BSD/macOS date doesn't support %3N and emits a non-numeric string (e.g. a
+# literal trailing "N") instead of erroring — host mode makes macOS a real
+# target now, so guard both timestamps the same way and just skip the
+# double-tap check rather than risk breaking the arithmetic below.
+case "$now_ms" in '' | *[!0-9]*) now_ms= ;; esac
+
+last_ms=0
+[ -r "$statefile" ] && read -r last_ms < "$statefile"
+case "$last_ms" in '' | *[!0-9]*) last_ms=0 ;; esac
+
+if [ -z "$now_ms" ]; then
+  :
+elif [ $((now_ms - last_ms)) -lt 1000 ]; then
+  rm -f "$statefile"
+  tmux confirm-before -p "Kill session ${session}? (y/n)" "kill-session -t =${session}"
+else
+  echo "$now_ms" > "$statefile"
+fi

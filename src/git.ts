@@ -71,6 +71,15 @@ export function sanitizeRemoteUrl(url: string): string {
   return url.replace(/^([a-z][a-z0-9+.-]*:\/\/)[^@/]+@/i, '$1');
 }
 
+// Short SHA fallback for a detached HEAD, matching wkt-git-badge's bash logic.
+export async function getCurrentBranch(cwd: string): Promise<string> {
+  try {
+    return await git(cwd, ['symbolic-ref', '--short', 'HEAD']);
+  } catch {
+    return git(cwd, ['rev-parse', '--short', 'HEAD']);
+  }
+}
+
 export async function branchExists(cwd: string, branch: string): Promise<boolean> {
   try {
     await git(cwd, ['rev-parse', '--verify', '--quiet', `refs/heads/${branch}`]);
@@ -78,6 +87,25 @@ export async function branchExists(cwd: string, branch: string): Promise<boolean
   } catch {
     return false;
   }
+}
+
+export async function listLocalBranches(cwd: string): Promise<string[]> {
+  const out = await git(cwd, ['branch', '--format=%(refname:short)']);
+  return out ? out.split('\n').filter(Boolean) : [];
+}
+
+// Branches already checked out in *some* worktree of this repo (this one or
+// any other, wkt-tracked or not) — `git worktree add` refuses all of them.
+export async function listWorktreeBranches(cwd: string): Promise<Set<string>> {
+  const out = await git(cwd, ['worktree', 'list', '--porcelain']);
+  const branches = new Set<string>();
+  for (const line of out.split('\n')) {
+    const match = /^branch refs\/heads\/(.+)$/.exec(line);
+    if (match) {
+      branches.add(match[1]!);
+    }
+  }
+  return branches;
 }
 
 export async function worktreeAdd(

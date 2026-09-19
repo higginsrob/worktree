@@ -60,10 +60,28 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/b
 # ollama — runtime binary only, no wrapper/integration (see project plan decision #2).
 RUN curl -fsSL https://ollama.com/install.sh | sh
 
-# vim-fugitive, baked in at build time (vim8 native package loading).
+# vim plugins, baked in at build time (vim8 native package loading — no
+# plugin manager, no runtime network access needed inside the read-only
+# container).
 RUN mkdir -p /usr/share/vim/vimfiles/pack/plugins/start \
-    && git clone --depth 1 https://github.com/tpope/vim-fugitive \
-         /usr/share/vim/vimfiles/pack/plugins/start/vim-fugitive
+    && for repo in \
+         tpope/vim-fugitive \
+         tpope/vim-commentary \
+         junegunn/fzf \
+         junegunn/fzf.vim \
+         pangloss/vim-javascript \
+         HerringtonDarkholme/yats.vim \
+         MaxMEllon/vim-jsx-pretty \
+         preservim/vim-markdown \
+         stephpy/vim-yaml \
+         cespare/vim-toml \
+         christoomey/vim-tmux-navigator \
+         ghifarit53/tokyonight-vim \
+       ; do \
+         name=$(basename "$repo"); \
+         git clone --depth 1 "https://github.com/${repo}" \
+           "/usr/share/vim/vimfiles/pack/plugins/start/${name}"; \
+       done
 
 # oh-my-zsh installed system-wide so it works regardless of the shared,
 # possibly-empty wkt-home volume mounted at $HOME.
@@ -76,10 +94,10 @@ RUN sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master
     && rm -f /root/.zshrc \
     && chmod -R go+rX ${ZSH}
 
-# OSC 52 clipboard passthrough + tmux statusline helper scripts.
-COPY bin/osc52-copy bin/wkt-git-badge bin/wkt-workspace-badge bin/wkt-status-click /usr/local/bin/
+# OSC 52 clipboard passthrough + tmux statusline/keybinding helper scripts.
+COPY bin/osc52-copy bin/wkt-git-badge bin/wkt-workspace-badge bin/wkt-status-click bin/wkt-doublec-check bin/wkt-detach-check /usr/local/bin/
 RUN chmod +x /usr/local/bin/osc52-copy /usr/local/bin/wkt-git-badge /usr/local/bin/wkt-workspace-badge \
-      /usr/local/bin/wkt-status-click
+      /usr/local/bin/wkt-status-click /usr/local/bin/wkt-doublec-check /usr/local/bin/wkt-detach-check
 
 # System-wide config defaults — independent of the shared home volume's state.
 COPY tmux.conf /etc/tmux.conf

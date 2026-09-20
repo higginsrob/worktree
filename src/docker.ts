@@ -216,6 +216,13 @@ export function attachTmux(containerName: string, workdir: string): Promise<numb
   return runInherit([
     'exec',
     '-it',
+    // docker exec doesn't forward the host's terminal env, and the container
+    // has no terminfo for e.g. xterm-ghostty — pin a known TERM and advertise
+    // truecolor so tmux/vim render the same as in host mode.
+    '-e',
+    'TERM=xterm-256color',
+    '-e',
+    'COLORTERM=truecolor',
     containerName,
     'tmux',
     'new-session',

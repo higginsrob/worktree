@@ -10,6 +10,8 @@ export const STATE_FILE = path.join(CONFIG_DIR, 'state.json');
 export const WORKTREES_DIR = path.join(xdgDataHome, 'wkt', 'worktrees');
 export const VIM_RUNTIME_DIR = path.join(xdgDataHome, 'wkt', 'vim-runtime');
 
+export const GITHUB_DIR = path.join(os.homedir(), 'Github');
+
 export const IMAGE_NAME = 'higginsrob/worktree:latest';
 export const HOME_VOLUME = 'wkt-home';
 

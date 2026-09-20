@@ -2,7 +2,7 @@ import readline from 'node:readline';
 import { removeWorktree, type ListEntry } from '../worktree.js';
 import { WORKTREE_COLUMNS, columnWidths, worktreeRows } from './worktree-table.js';
 
-const NOTE = 'D deletes the highlighted worktree (asks to confirm first).';
+const NOTE = 'wkt open - Create, attach or delete a worktree workspace. Type "D" to delete'
 
 // Only a real tracked worktree can be deleted — not the untracked current-dir
 // row (that's just your own checkout) and not a creatable-branch row (there's

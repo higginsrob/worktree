@@ -22,7 +22,18 @@ a worktree with that name already exists (`wkt open` instead), or if
 commonly right here, in the repo you ran `wkt add` from. In that last case
 the error points you at `wkt open <name>` instead (see below).
 
+### `wkt clone <org/repo | url>`
+
+Clones into `$HOME/Github/<org>/<repo>` (`org/repo` means
+`https://github.com/org/repo.git`; a full URL also works, and lands under the
+org/repo parsed from it), then runs `wkt open` from that directory. If the
+directory already exists it just opens it.
+
 ### `wkt open [name] [options]`
+
+`wkt open org/repo` (two segments, not a tracked worktree name) does the same
+as `wkt clone org/repo`: clones to `$HOME/Github/<org>/<repo>` if missing, then
+opens from there.
 
 Attaches to an existing worktree. For a `--sandbox` worktree, recreates its
 container if missing (unless `--no-create`); containers run with `--rm`, so
@@ -56,6 +67,10 @@ there yet. Picking a `branch (new)` row creates a new host worktree for it
 on the spot — this is what lets `wkt open` double as "turn a branch already
 on the host into a worktree" without typing `wkt add`. `--no-create` leaves
 those rows out of the picker, same as it disables fallback (2) above.
+The picker lists the `$PWD` checkout and its local branches first as their
+own group, followed by the other worktrees. `wkt open --branch` shows only
+that group; `wkt open --no-branch` shows only worktrees and leaves out the
+`branch (new)` rows.
 Without a TTY (piped input, scripts, CI) it falls back to auto-picking when
 exactly one worktree exists, or failing with the full list of names to
 choose from.

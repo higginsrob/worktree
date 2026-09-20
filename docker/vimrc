@@ -46,6 +46,11 @@ set wildmenu
 set laststatus=2
 set backspace=indent,eol,start
 set updatetime=300
+" The default (auto) regex engine hangs vim's TypeScript syntax on some
+" ordinary lines, e.g. `export async function f(a: T[]): Promise<string | null> {`
+" (redraws stall until 'redrawtime' expires and highlighting is disabled).
+" The NFA engine handles them instantly.
+set regexpengine=2
 " New splits open below/right of the current window instead of above/left.
 set splitbelow
 set splitright
@@ -164,20 +169,29 @@ function! s:WktNetrwSync() abort
 endfunction
 
 function! s:WktNetrwResize() abort
+  " Runs on every WinScrolled (i.e. every scroll in any window), so bail out
+  " cheaply when there's no netrw window: an unconditional `redraw` here
+  " forces a full repaint per scroll and re-runs syntax highlighting until
+  " 'redrawtime' is exceeded and vim disables it.
+  let l:netrw = filter(range(1, winnr('$')), {_, w -> getwinvar(w, '&filetype') ==# 'netrw'})
+  if empty(l:netrw)
+    return
+  endif
   let l:cur = win_getid()
-  for l:w in range(1, winnr('$'))
-    if getwinvar(l:w, '&filetype') !=# 'netrw'
-      continue
-    endif
+  let l:changed = 0
+  for l:w in l:netrw
     noautocmd call win_gotoid(win_getid(l:w))
     if s:WktNetrwSync()
       silent! execute "normal \<Plug>NetrwRefresh"
+      let l:changed = 1
     endif
   endfor
   noautocmd call win_gotoid(l:cur)
   " WinResized fires after vim has already drawn; without this the refreshed
   " buffer isn't painted until the next focus change.
-  redraw
+  if l:changed
+    redraw
+  endif
 endfunction
 
 " After netrw opens a file in a vertical split, shrink netrw to a 16-col

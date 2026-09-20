@@ -4,6 +4,7 @@ import { doctorAction } from './commands/doctor.js';
 import { buildImageAction } from './commands/build-image.js';
 import { addAction } from './commands/add.js';
 import { openAction } from './commands/open.js';
+import { cloneAction } from './commands/clone.js';
 import { listAction } from './commands/list.js';
 import { rmAction } from './commands/rm.js';
 import { syncAction } from './commands/sync.js';
@@ -40,6 +41,8 @@ program
   .command('open [name]')
   .description('attach to an existing worktree (recreating its sandbox container if missing)')
   .option('--no-create', "fail instead of creating if the volume doesn't exist (--sandbox only)")
+  .option('--branch', "picker: show only the current directory's worktree and its local branches")
+  .option('--no-branch', "picker: show only worktrees, not the current directory's local branches")
   .option('--pull', 'check the image digest on Docker Hub before starting (--sandbox only)')
   .option(
     '--rebuild',
@@ -54,6 +57,11 @@ program
   .option('--publish <spec>', 'alias for --port (--sandbox only)', collect, [])
   .option('--network-host', '--network=host (--sandbox only)')
   .action(openAction);
+
+program
+  .command('clone <repo>')
+  .description('git clone org/repo (or a URL) into ~/Github/<org>/<repo>, then wkt open there')
+  .action(cloneAction);
 
 program
   .command('list')

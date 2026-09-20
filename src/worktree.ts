@@ -483,6 +483,31 @@ export async function listCreatableBranches(
   return entries;
 }
 
+// The entry (tracked or the untracked current-dir row) whose checkout is the
+// repo root containing `cwd`, if any.
+export async function findPwdEntry(
+  entries: ListEntry[],
+  cwd: string = process.cwd(),
+): Promise<ListEntry | undefined> {
+  let root: string;
+  try {
+    root = await getRepoRoot(cwd);
+  } catch {
+    return undefined;
+  }
+  const realRoot = await fs.realpath(root).catch(() => root);
+  for (const entry of entries) {
+    if (entry.creatable) {
+      continue;
+    }
+    const real = await fs.realpath(entry.record.worktreePath).catch(() => entry.record.worktreePath);
+    if (real === realRoot) {
+      return entry;
+    }
+  }
+  return undefined;
+}
+
 export async function removeWorktree(name: string): Promise<void> {
   const state = await readState();
   const record = getRecord(state, name);

@@ -10,10 +10,14 @@ set -u
 session="${1:?session name required}"
 pane="${2:?pane id required}"
 statefile="/tmp/.wkt-doublec-${session}"
+# GNU date has %3N; BSD/macOS date doesn't (it prints a literal trailing "N"),
+# so fall back to perl (ships with macOS), then to whole seconds.
 now_ms=$(date +%s%3N)
-# See wkt-doublec-check: BSD/macOS date lacks %3N, so guard against a
-# non-numeric timestamp instead of risking broken arithmetic below.
-case "$now_ms" in '' | *[!0-9]*) now_ms= ;; esac
+case "$now_ms" in '' | *[!0-9]*)
+  now_ms=$(perl -MTime::HiRes=time -e 'printf "%d", time * 1000' 2>/dev/null)
+  case "$now_ms" in '' | *[!0-9]*) now_ms=$(($(date +%s) * 1000)) ;; esac
+  ;;
+esac
 
 last_ms=0
 [ -r "$statefile" ] && read -r last_ms < "$statefile"

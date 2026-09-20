@@ -62,10 +62,32 @@ let g:vim_markdown_folding_disabled = 1
 " --- Leader key ----------------------------------------------------------
 let mapleader = " "
 nnoremap <leader>q :q<CR>
-nnoremap <leader>x :qa!<CR>
-" t/c open a tmux pane (side-by-side / stacked) in vim's cwd, not a vim terminal.
+nnoremap <leader>x :x<CR>
+nnoremap <leader>w :w<CR>
+" Reload vim's and tmux's config. $WKT_VIMRC/$WKT_TMUX_CONF are set in host
+" mode (see attachHostTmux in src/host.ts); the sandbox uses the baked-in paths.
+nnoremap <silent> <leader>r :execute 'source ' . fnameescape(empty($WKT_VIMRC) ? '/etc/vim/vimrc.local' : $WKT_VIMRC) \| call system('tmux source-file ' . shellescape(empty($WKT_TMUX_CONF) ? '/etc/tmux.conf' : $WKT_TMUX_CONF)) \| echo 'reloaded vim + tmux config'<CR>
+" t/T open a tmux pane (side-by-side / stacked) in vim's cwd, not a vim terminal.
 nnoremap <silent> <leader>t :call system('tmux split-window -h -c ' . shellescape(getcwd()))<CR>
-nnoremap <silent> <leader>c :call system('tmux split-window -v -c ' . shellescape(getcwd()))<CR>
+nnoremap <silent> <leader>T :call system('tmux split-window -v -c ' . shellescape(getcwd()))<CR>
+" Open a tmux pane in cwd running <cmd>; -h is side-by-side, -v is stacked.
+" The pane closes when the command succeeds; on a non-zero exit it drops to a
+" shell so the error output stays readable.
+function! s:WktTmuxRun(flag, cmd) abort
+  let l:wrapped = a:cmd . '; rc=$?; [ "$rc" -eq 0 ] || { echo "[exit $rc]"; exec "${SHELL:-sh}"; }'
+  call system('tmux split-window ' . a:flag . ' -c ' . shellescape(getcwd()) . ' ' . shellescape(l:wrapped))
+endfunction
+" Package script runner: bun if installed, else npm. `start` has no `run`.
+function! s:WktPkg(script) abort
+  let l:sub = a:script ==# 'start' ? 'start' : 'run ' . a:script
+  return 'if command -v bun >/dev/null 2>&1; then bun ' . l:sub . '; else npm ' . l:sub . '; fi'
+endfunction
+nnoremap <silent> <leader>d :call <SID>WktTmuxRun('-h', <SID>WktPkg('dev'))<CR>
+nnoremap <silent> <leader>D :call <SID>WktTmuxRun('-v', <SID>WktPkg('dev'))<CR>
+nnoremap <silent> <leader>s :call <SID>WktTmuxRun('-h', <SID>WktPkg('start'))<CR>
+nnoremap <silent> <leader>S :call <SID>WktTmuxRun('-v', <SID>WktPkg('start'))<CR>
+nnoremap <silent> <leader>b :call <SID>WktTmuxRun('-h', <SID>WktPkg('build'))<CR>
+nnoremap <silent> <leader>B :call <SID>WktTmuxRun('-v', <SID>WktPkg('build'))<CR>
 " Focus an already-open netrw window if there is one, else browse cwd here.
 function! s:WktFocusNetrw() abort
   for l:w in range(1, winnr('$'))
@@ -79,7 +101,8 @@ endfunction
 nnoremap <silent> <leader>e :call <SID>WktFocusNetrw()<CR>
 nnoremap <leader>v :vsplit<CR>
 nnoremap <leader>h :split<CR>
-nnoremap <silent> <leader>a :call system('tmux split-window -h -c ' . shellescape(getcwd()) . ' claude')<CR>
+nnoremap <silent> <leader>a :call <SID>WktTmuxRun('-h', 'claude')<CR>
+nnoremap <silent> <leader>A :call <SID>WktTmuxRun('-v', 'claude')<CR>
 
 " Persistent undo/viminfo so history survives container restarts across
 " `wkt open` reattaches ($HOME is a persistent volume). Falls back to /tmp

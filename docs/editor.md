@@ -43,16 +43,26 @@ your own `~/.vimrc` on the shared home volume for anything more opinionated.
 `<leader>` is space. New splits (including `:terminal`) open below/right of
 the current window (`splitbelow`/`splitright`), not above/left.
 
-| Mapping     | Runs                                     |
-| ----------- | ---------------------------------------- |
-| `<leader>q` | `:q`                                     |
-| `<leader>x` | `:qa!`                                   |
-| `<leader>t` | new tmux pane, side by side              |
-| `<leader>c` | new tmux pane, stacked below             |
-| `<leader>e` | `:e .` (netrw)                           |
-| `<leader>v` | vertical split                           |
-| `<leader>h` | horizontal split                         |
-| `<leader>a` | vertical split terminal running `claude` |
+| Mapping                             | Runs                                                      |
+| ----------------------------------- | --------------------------------------------------------- |
+| `<leader>q`                         | `:q`                                                      |
+| `<leader>x`                         | `:x` (save if changed, then quit)                         |
+| `<leader>t`                         | new tmux pane, side by side                               |
+| `<leader>T`                         | new tmux pane, stacked below                              |
+| `<leader>e`                         | `:e .` (netrw)                                            |
+| `<leader>v`                         | vertical split                                            |
+| `<leader>h`                         | horizontal split                                          |
+| `<leader>a`                         | tmux pane side by side running `claude`                   |
+| `<leader>A`                         | same, stacked below                                       |
+| `<leader>w`                         | `:w`                                                      |
+| `<leader>r`                         | reload vim + tmux config                                  |
+| `<leader>d`                         | side-by-side pane: `bun run dev` (else `npm run dev`)     |
+| `<leader>s`                         | side-by-side pane: `bun start` (else `npm start`)         |
+| `<leader>b`                         | side-by-side pane: `bun run build` (else `npm run build`) |
+| `<leader>D` `<leader>S` `<leader>B` | same as `d`/`s`/`b`, stacked below                        |
+
+The `a`/`A`/`d`/`s`/`b` panes close when their command exits successfully; on a
+non-zero exit they stay open in a shell so the error is readable.
 
 ## Colorscheme & statusline
 

@@ -155,6 +155,7 @@ export async function attachHostTmux(opts: AttachHostOptions): Promise<number> {
     WKT_REPO_NAME: opts.repoName,
     WKT_WORKSPACE_DIR: opts.worktreePath,
     WKT_VIMRC: HOST_VIMRC,
+    WKT_TMUX_CONF: HOST_TMUX_CONF,
     WKT_VIM_RUNTIME_DIR: VIM_RUNTIME_DIR,
   };
 
@@ -162,7 +163,7 @@ export async function attachHostTmux(opts: AttachHostOptions): Promise<number> {
   // `#(...)` jobs run with the *session* environment — not the env of whichever
   // client happened to start the server. Without -e, a second session would
   // inherit the first session's WKT_* values. Requires tmux >= 3.2.
-  const sessionEnv = ['WKT_REPO_NAME', 'WKT_WORKSPACE_DIR', 'WKT_VIMRC', 'WKT_VIM_RUNTIME_DIR'].flatMap(
+  const sessionEnv = ['WKT_REPO_NAME', 'WKT_WORKSPACE_DIR', 'WKT_VIMRC', 'WKT_TMUX_CONF', 'WKT_VIM_RUNTIME_DIR'].flatMap(
     (key) => ['-e', `${key}=${env[key]}`],
   );
 

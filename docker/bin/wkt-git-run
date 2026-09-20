@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# Runs one git command inside a fresh tmux pane opened by wkt-git-menu.
+#   wkt-git-run pager <git args...>   read-only view, left open in a pager until you quit it
+#   wkt-git-run run   <git args...>   action; the pane closes itself when git exits 0
+# On a non-zero exit the pane stays open so the error can be read.
+set -u
+
+mode="${1:?mode required}"
+shift
+
+if [ "$mode" = "pager" ]; then
+  # -R keeps colors; no -F/-X so short output still waits for `q`.
+  LESS="-R" git -c color.ui=always --paginate "$@"
+else
+  git "$@"
+fi
+rc=$?
+
+[ "$rc" -eq 0 ] && exit 0
+printf '\n\033[1;31mgit %s exited with status %d\033[0m — press any key to close ' "$1" "$rc"
+read -rsn1
+exit "$rc"

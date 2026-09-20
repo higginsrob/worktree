@@ -53,6 +53,8 @@ while your dev server, build, or agent runs beside it.
 | `<leader>T` | New terminal pane, stacked below             |
 | `<leader>a` | Side-by-side pane running `claude`           |
 | `<leader>A` | Same, stacked below                          |
+| `<leader>c` | Side-by-side pane running Cursor `agent`     |
+| `<leader>C` | Same, stacked below                          |
 | `<leader>v` | Vim vertical split                           |
 | `<leader>h` | Vim horizontal split                         |
 | `<leader>e` | File explorer (`:e .`)                       |
@@ -124,8 +126,8 @@ Full reference: [`docs/editor.md`](docs/editor.md).
 
 - **Parallel branches**: `wkt add fix-login`, `wkt add refactor-api` — each
   is a real worktree with its own session; `wkt list` shows them all.
-- **Agent alongside your editor**: `<leader>a` puts `claude` in a pane next
-  to vim, in the same worktree.
+- **Agent alongside your editor**: `<leader>a` / `<leader>c` put `claude` or
+  Cursor `agent` in a pane next to vim, in the same worktree.
 - **Dev server on the side**: `<leader>d` for the server, `<leader>t` for a
   scratch shell, Ctrl-hjkl to hop between them.
 - **Review in place**: `:Git` for status, `:Gdiffsplit` for a diff, click

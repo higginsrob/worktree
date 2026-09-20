@@ -8,6 +8,10 @@ const xdgDataHome = process.env.XDG_DATA_HOME ?? path.join(os.homedir(), '.local
 export const CONFIG_DIR = path.join(xdgConfigHome, 'wkt');
 export const STATE_FILE = path.join(CONFIG_DIR, 'state.json');
 export const WORKTREES_DIR = path.join(xdgDataHome, 'wkt', 'worktrees');
+// One file per host tmux session: "switch to worktree X" requests written by
+// `wkt switch` (tmux statusline menu) and consumed by the `wkt` process that
+// is attached to that session, once the switch detaches it.
+export const HANDOFF_DIR = path.join(xdgDataHome, 'wkt', 'handoff');
 export const VIM_RUNTIME_DIR = path.join(xdgDataHome, 'wkt', 'vim-runtime');
 
 export const GITHUB_DIR = path.join(os.homedir(), 'Github');

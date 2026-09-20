@@ -108,6 +108,8 @@ nnoremap <leader>v :vsplit<CR>
 nnoremap <leader>h :split<CR>
 nnoremap <silent> <leader>a :call <SID>WktTmuxRun('-h', 'claude')<CR>
 nnoremap <silent> <leader>A :call <SID>WktTmuxRun('-v', 'claude')<CR>
+nnoremap <silent> <leader>c :call <SID>WktTmuxRun('-h', 'agent')<CR>
+nnoremap <silent> <leader>C :call <SID>WktTmuxRun('-v', 'agent')<CR>
 
 " Persistent undo/viminfo so history survives container restarts across
 " `wkt open` reattaches ($HOME is a persistent volume). Falls back to /tmp
@@ -267,6 +269,9 @@ hi SpellBad cterm=underline ctermfg=black ctermbg=yellow gui=undercurl guifg=#00
 let &fillchars = (empty(&fillchars) ? '' : &fillchars . ',') . 'vert: '
 " Same color as the active statusline background (tokyonight night bg3).
 highlight VertSplit ctermfg=237 ctermbg=237 guifg=#32344a guibg=#32344a
+" The command line / message row below the statusline (drag it to resize,
+" confirmation messages show up there) gets the same bar color.
+highlight MsgArea ctermfg=146 ctermbg=237 guifg=#a9b1d6 guibg=#32344a
 highlight WktFileType ctermfg=234 ctermbg=111 guifg=#1a1b26 guibg=#7aa2f7 gui=bold cterm=bold
 highlight WktFileTypeNC ctermfg=103 ctermbg=236 guifg=#565f89 guibg=#24283b gui=NONE cterm=NONE
 

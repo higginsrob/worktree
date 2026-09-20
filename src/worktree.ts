@@ -47,6 +47,7 @@ import {
   tmuxSessionName,
   worktreeName,
   WORKTREES_DIR,
+  HANDOFF_DIR,
   HOME_VOLUME,
 } from './config.js';
 import { readState, writeState, type WktState, type WorktreeRecord } from './state.js';
@@ -88,6 +89,7 @@ async function createContainerFor(
   const identity = await getUserIdentity(record.repoRoot);
   const workspacePath = `/workspace/${record.repo}`;
   const env: Record<string, string> = {
+    WKT_MODE: 'sandbox',
     WKT_REPO_NAME: `${record.org}/${record.repo}`,
     WKT_WORKSPACE_DIR: workspacePath,
     // Points the shared tmux.conf's session-created hook at the same vimrc
@@ -209,10 +211,50 @@ export async function addWorktree(
 // being `--rm`, removed) — a plain detach leaves the session (and container)
 // running. Host: there's no container to tear down; a detach just leaves the
 // host tmux session running, discoverable next time via hasHostTmuxSession.
+//
+// Host sessions can hand off: `wkt switch` (the statusline workspace menu)
+// writes the target worktree name to a per-session file and detaches the
+// client; when tmux returns here we attach to that worktree instead of exiting.
+export function hostSessionName(record: WorktreeRecord): string {
+  return tmuxSessionName(record.org, record.repo, record.branch, record.worktreePath);
+}
+
+export function handoffPath(session: string): string {
+  return path.join(HANDOFF_DIR, session);
+}
+
+async function takeHandoff(session: string): Promise<string | undefined> {
+  const file = handoffPath(session);
+  try {
+    const name = (await fs.readFile(file, 'utf8')).trim();
+    await fs.rm(file, { force: true });
+    return name || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export async function attach(record: WorktreeRecord): Promise<number> {
+  let current = record;
+  for (;;) {
+    if (current.mode !== 'host') {
+      return attachOnce(current);
+    }
+    const session = hostSessionName(current);
+    await fs.rm(handoffPath(session), { force: true }); // drop any stale request
+    const code = await attachOnce(current);
+    const next = await takeHandoff(session);
+    if (!next) {
+      return code;
+    }
+    current = await openWorktree(next);
+  }
+}
+
+async function attachOnce(record: WorktreeRecord): Promise<number> {
   if (record.mode === 'host') {
     return attachHostTmux({
-      sessionName: tmuxSessionName(record.org, record.repo, record.branch, record.worktreePath),
+      sessionName: hostSessionName(record),
       worktreePath: record.worktreePath,
       repoName: `${record.org}/${record.repo}`,
     });

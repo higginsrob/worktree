@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Renders a tmux statusline "sandbox" pill when this session is a --sandbox
+# worktree. Empty for host-mode sessions.
+set -u
+
+session="${1:-}"
+
+mode=""
+if [ -n "$session" ]; then
+  mode=$(tmux show-environment -t "$session" WKT_MODE 2>/dev/null | sed -n 's/^WKT_MODE=//p')
+fi
+mode="${mode:-${WKT_MODE:-}}"
+
+if [ -z "$mode" ] && [ -n "$session" ]; then
+  ws=$(tmux show-environment -t "$session" WKT_WORKSPACE_DIR 2>/dev/null | sed -n 's/^WKT_WORKSPACE_DIR=//p')
+  ws="${ws:-${WKT_WORKSPACE_DIR:-}}"
+  case "$ws" in
+    /workspace/*) mode=sandbox ;;
+  esac
+fi
+
+if [ "$mode" = "sandbox" ]; then
+  echo "#[fg=#1a1b26,bg=#e0af68,bold] sandbox #[default] "
+fi

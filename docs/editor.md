@@ -54,6 +54,8 @@ the current window (`splitbelow`/`splitright`), not above/left.
 | `<leader>h`                         | horizontal split                                          |
 | `<leader>a`                         | tmux pane side by side running `claude`                   |
 | `<leader>A`                         | same, stacked below                                       |
+| `<leader>c`                         | tmux pane side by side running Cursor `agent`             |
+| `<leader>C`                         | same, stacked below                                       |
 | `<leader>w`                         | `:w`                                                      |
 | `<leader>r`                         | reload vim + tmux config                                  |
 | `<leader>d`                         | side-by-side pane: `bun run dev` (else `npm run dev`)     |

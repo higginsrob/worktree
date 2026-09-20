@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+# Pops up a tmux menu of common git commands (statusline branch badge click).
+#   wkt-git-menu <repo_dir> <client> <pane_width> <pane_height>
+# Picking an item opens a new pane running the command via wkt-git-run. The
+# split direction follows the current pane's shape: terminal cells are about
+# twice as tall as wide, so width >= 2*height means "wide" -> side by side (-h),
+# otherwise stack the new pane below (-v).
+set -u
+
+repo_dir="${1:-}"
+client="${2:-}"
+width="${3:-0}"
+height="${4:-0}"
+
+if [ -z "$repo_dir" ] || ! git -C "$repo_dir" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  tmux display-message "wkt: not inside a git repository"
+  exit 0
+fi
+
+split="-v"
+[ "$width" -ge $((height * 2)) ] 2>/dev/null && split="-h"
+
+# Double-quote for a tmux command string; ## so '#' isn't format-expanded.
+dir=${repo_dir//\\/\\\\}
+dir=${dir//\"/\\\"}
+dir=${dir//\$/\\\$}
+dir=${dir//#/##}
+
+args=()
+add() { # label key mode git-args...
+  local label="$1" key="$2" mode="$3"
+  shift 3
+  args+=("$label" "$key" "split-window $split -c \"$dir\" wkt-git-run $mode $*")
+}
+sep() { args+=("" "" ""); }
+
+add "status"           s pager status
+add "diff"             d pager diff
+add "diff --staged"    D pager diff --staged
+add "log (graph)"      l pager log --oneline --graph --decorate --all -n 300
+add "branches"         b pager branch -vv -a
+sep
+add "add -A"           a run add -A
+add "commit"           c run commit
+add "fetch --all"      f run fetch --all --prune
+add "pull"             p run pull
+add "push"             P run push
+sep
+add "stash"            z run stash
+add "stash pop"        Z run stash pop
+
+exec tmux display-menu ${client:+-c "$client"} -T "#[align=centre] git " -x R -y S "${args[@]}"

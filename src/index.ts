@@ -6,6 +6,7 @@ import { addAction } from './commands/add.js';
 import { openAction } from './commands/open.js';
 import { cloneAction } from './commands/clone.js';
 import { listAction } from './commands/list.js';
+import { switchAction } from './commands/switch.js';
 import { rmAction } from './commands/rm.js';
 import { syncAction } from './commands/sync.js';
 import {
@@ -70,6 +71,14 @@ program
       "plus the current directory's worktree if it isn't tracked",
   )
   .action(listAction);
+
+program
+  .command('switch [name]', { hidden: true })
+  .description('used by the tmux statusline: switch this session\'s client to another worktree')
+  .option('--menu', 'show the tmux worktree menu instead of switching directly')
+  .option('--session <name>', 'tmux session being switched away from')
+  .option('--client <name>', 'tmux client to show the menu on')
+  .action(switchAction);
 
 program
   .command('sync [name]')

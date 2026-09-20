@@ -10,8 +10,9 @@ gives you tmux window controls and read-only repo status, nothing more.
 | **Window tabs** | `#I:#W`                                      | tmux's built-in window list — click to select                       |
 | **-** (yellow)  | Split horizontal                             | `split-window -v` in the current path                               |
 | **\|** (cyan)   | Split vertical                               | `split-window -h` in the current path                               |
-| **WORKSPACE**   | `org/repo`                                   | Informational — click copies it to your host clipboard (via OSC 52) |
-| **GIT**         | Current branch, colored by state (see below) | Opens a popup with `git status -sb`                                 |
+| **sandbox**     | (sandbox worktrees only) yellow **sandbox** pill | — |
+| **WORKSPACE**   | `org/repo`                                   | Opens a menu of worktrees (same columns as `wkt list`); Up/Down + Enter detaches this session and attaches the chosen one. Host sessions only |
+| **GIT**         | Current branch, colored by state (see below) | Opens a menu of common git commands; the pick runs in a new pane (side-by-side if the current pane is wide, stacked otherwise). Read-only views (status, diff, log, branches) stay open in a pager; actions (add, commit, fetch, pull, push, stash) close the pane on success and stay open on error |
 
 There are deliberately **no push/pull/sync actions in the statusline** — those stay
 host-only `wkt` commands (`wkt sync`, `wkt git push`, ...), so a container never has
@@ -42,6 +43,6 @@ no X11 forwarding, no host filesystem access needed.
 ## Implementation
 
 The badge text/color and click dispatch are computed by small scripts baked into
-the image (`docker/bin/wkt-git-badge`, `wkt-workspace-badge`, `wkt-status-click`),
+the image (`docker/bin/wkt-git-badge`, `wkt-sandbox-badge`, `wkt-workspace-badge`, `wkt-status-click`),
 wired up via tmux's named click regions (`#[range=user|<name>]...#[norange]`) and
 `MouseDown1StatusLeft`/`MouseDown1StatusRight` bindings in `docker/tmux.conf`.

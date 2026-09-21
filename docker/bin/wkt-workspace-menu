@@ -1,0 +1,103 @@
+#!/usr/bin/env bash
+# Pops up the workspace menu (statusline WORKSPACE badge click).
+#   wkt-workspace-menu <session> <client>
+# Session actions (detach / delete / exit) work everywhere. The worktree and
+# branch lists are live in host sessions (picking one hands this client off to
+# that worktree via `wkt switch`) and read-only in sandbox sessions, where
+# `wkt` isn't installed.
+set -u
+
+session="${1:-}"
+client="${2:-}"
+
+senv() { # session-scoped env value, falling back to this process's env
+  local v
+  v=$(tmux show-environment -t "$session" "$1" 2>/dev/null | sed -n "s/^$1=//p")
+  printf '%s' "${v:-${!1:-}}"
+}
+
+mode=$(senv WKT_MODE)
+repo_name=$(senv WKT_REPO_NAME)
+repo_dir=$(senv WKT_WORKSPACE_DIR)
+repo_dir="${repo_dir:-$(printf '%s\n' /workspace/*/ 2>/dev/null | head -n1)}"
+
+live=""
+[ "$mode" = "host" ] && command -v wkt >/dev/null 2>&1 && live=1
+
+# Names end up in a double-quoted tmux command that goes through sh
+# (single-quoted); skip the rare ones that can't survive both.
+safe() { case "$1" in *[\"\'\$\`\\]* | *$'\n'*) return 1 ;; esac; }
+esc() { printf '%s' "${1//#/##}"; }
+
+args=()
+add() { args+=("$1" "$2" "$3"); }
+sep() { args+=("" "" ""); }
+head_() { args+=("-$(esc "$1")" "" ""); }
+
+q_session=${session//\"/}
+add "detach session" d "detach-client -s \"$q_session\""
+add "delete session" x "confirm-before -p \"delete session $q_session? (y/n)\" \"kill-session -t =$q_session\""
+add "exit session"   q "kill-session -t =$q_session"
+
+# Main checkout of this repo: first entry of `git worktree list`.
+main_dir=""
+if [ -n "$repo_dir" ]; then
+  main_dir=$(git -C "$repo_dir" worktree list --porcelain 2>/dev/null | sed -n '1s/^worktree //p')
+  main_dir="${main_dir:-$repo_dir}"
+fi
+
+# Adds one selectable (host) or disabled (sandbox) row.
+row() { # text key current(0/1) switch-name
+  local text="$1" key="$2" cur="$3" name="$4" mark="  "
+  [ "$cur" = 1 ] && mark="* "
+  if [ -n "$live" ] && safe "$name" && safe "$session" && safe "$main_dir"; then
+    add "$mark$(esc "$text")" "$key" "run-shell -b \"cd '$main_dir' && wkt switch '$name' --session '$session'\""
+  else
+    add "-$mark$(esc "$text")" "" ""
+  fi
+}
+
+# --- worktree workspaces ----------------------------------------------------
+sep
+head_ "  Workspaces"
+n=0
+if [ -n "$live" ]; then
+  while IFS=$'\t' read -r name branch wmode running; do
+    [ -z "$name" ] && continue
+    case "$name" in "$repo_name"/*) ;; *) continue ;; esac
+    n=$((n + 1))
+    key=""; [ "$n" -le 9 ] && key="$n"
+    text="$branch ($wmode"; [ "$running" = yes ] && text="$text, running"; text="$text)"
+    cur=0; [ "$branch" = "$(git -C "$repo_dir" symbolic-ref --short HEAD 2>/dev/null)" ] && cur=1
+    if safe "$name" && safe "$session" && safe "$main_dir"; then
+      add "$([ "$cur" = 1 ] && echo '* ' || echo '  ')$(esc "$text")" "$key" \
+        "run-shell -b \"cd '$main_dir' && wkt switch '$name' --session '$session'\""
+    fi
+  done < <(wkt switch --list 2>/dev/null)
+else
+  # Sandbox: the host records this repo's worktrees in the container env at creation.
+  IFS=',' read -ra wts <<< "$(senv WKT_WORKTREES)"
+  cur_branch=$(git -C "$repo_dir" symbolic-ref --short HEAD 2>/dev/null)
+  for b in "${wts[@]}"; do
+    [ -z "$b" ] && continue
+    n=$((n + 1))
+    row "$b" "" "$([ "$b" = "$cur_branch" ] && echo 1 || echo 0)" ""
+  done
+fi
+[ "$n" -eq 0 ] && add "-  (none)" "" ""
+
+# --- branches of the main checkout -----------------------------------------
+sep
+head_ "  Branches"
+cur_branch=$(git -C "$repo_dir" symbolic-ref --short HEAD 2>/dev/null)
+b_count=0
+if [ -n "$main_dir" ]; then
+  while IFS= read -r b; do
+    [ -z "$b" ] && continue
+    b_count=$((b_count + 1))
+    row "$b" "" "$([ "$b" = "$cur_branch" ] && echo 1 || echo 0)" "$repo_name/$b"
+  done < <(git -C "$main_dir" for-each-ref --format='%(refname:short)' refs/heads 2>/dev/null)
+fi
+[ "$b_count" -eq 0 ] && add "-  (none)" "" ""
+
+exec tmux display-menu ${client:+-c "$client"} -T "#[align=centre] workspace " -x R -y S "${args[@]}"

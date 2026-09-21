@@ -26,6 +26,10 @@ wkt doctor   # checks git, tmux, vim, node, disk space
 Requires git, tmux, vim, and Node.js ≥ 20. Vim plugins are cloned once into
 `~/.local/share/wkt/` on first use (or up front with `wkt setup-host`).
 
+On a fresh machine, `wkt provision` walks you through installing everything
+else (Node, Bun, zsh, Docker, Claude/Codex/Cursor agents, vim, tmux, …) and
+wiring up the wkt vim/tmux configs and shell aliases.
+
 ## Quick start
 
 ```sh

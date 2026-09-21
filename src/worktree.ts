@@ -1,4 +1,6 @@
+import { execFile } from 'node:child_process';
 import fs from 'node:fs/promises';
+import { promisify } from 'node:util';
 import os from 'node:os';
 import path from 'node:path';
 import {
@@ -52,6 +54,8 @@ import {
 } from './config.js';
 import { readState, writeState, type WktState, type WorktreeRecord } from './state.js';
 
+const execFileAsync = promisify(execFile);
+
 function getRecord(state: WktState, name: string): WorktreeRecord {
   const record = state.worktrees[name];
   if (!record) {
@@ -88,10 +92,17 @@ async function createContainerFor(
   }
   const identity = await getUserIdentity(record.repoRoot);
   const workspacePath = `/workspace/${record.repo}`;
+  // Snapshot for the (read-only) statusline workspace menu; `wkt` isn't
+  // available inside the container to ask live.
+  const siblings = Object.values((await readState()).worktrees)
+    .filter((r) => r.org === record.org && r.repo === record.repo)
+    .map((r) => r.branch)
+    .filter((b) => !b.includes(','));
   const env: Record<string, string> = {
     WKT_MODE: 'sandbox',
     WKT_REPO_NAME: `${record.org}/${record.repo}`,
     WKT_WORKSPACE_DIR: workspacePath,
+    WKT_WORKTREES: siblings.join(','),
     // Points the shared tmux.conf's session-created hook at the same vimrc
     // it always used; host mode sets this to the package's bundled vimrc
     // instead (see attachHostTmux in host.ts).
@@ -234,7 +245,47 @@ async function takeHandoff(session: string): Promise<string | undefined> {
   }
 }
 
+// Ask the `wkt` process that attached `session` to attach `name` next, and
+// detach the session's client so it does. Used by `wkt switch` and by
+// `wkt open` when run from inside a wkt host session.
+export async function requestHandoff(name: string, session: string): Promise<void> {
+  await fs.mkdir(HANDOFF_DIR, { recursive: true });
+  await fs.writeFile(handoffPath(session), name);
+  await execFileAsync('tmux', ['detach-client', '-s', session]);
+}
+
+// `wkt open` from inside tmux: tmux refuses to nest sessions. In a wkt host
+// session we hand off to the target instead; in a sandbox there's no way to
+// reach the host's tmux, so say so. Returns undefined when not applicable.
+async function attachFromInsideTmux(record: WorktreeRecord): Promise<number | undefined> {
+  if (!process.env.TMUX) {
+    return undefined;
+  }
+  const mode = process.env.WKT_MODE;
+  if (mode === 'sandbox') {
+    throw new Error(
+      'nested tmux sessions inside a sandboxed dev environment are not allowed — detach first (Ctrl-b d), then run wkt open on the host',
+    );
+  }
+  if (mode !== 'host') {
+    return undefined; // someone else's tmux; leave tmux's own nesting check to speak
+  }
+  const target = process.env.TMUX_PANE ? ['-t', process.env.TMUX_PANE] : [];
+  const { stdout } = await execFileAsync('tmux', ['display-message', '-p', ...target, '#{session_name}']);
+  const session = stdout.trim();
+  if (record.mode === 'host' && hostSessionName(record) === session) {
+    console.log(`Already in ${record.name}.`);
+    return 0;
+  }
+  await requestHandoff(record.name, session);
+  return 0;
+}
+
 export async function attach(record: WorktreeRecord): Promise<number> {
+  const nested = await attachFromInsideTmux(record);
+  if (nested !== undefined) {
+    return nested;
+  }
   let current = record;
   for (;;) {
     if (current.mode !== 'host') {

@@ -24,13 +24,7 @@ case "$range" in
     tmux split-window -v -c "$pane_path"
     ;;
   workspace)
-    # Worktree switcher menu (`wkt list` columns). Host sessions only: `wkt`
-    # isn't installed inside the sandbox container.
-    if command -v wkt >/dev/null 2>&1; then
-      wkt switch --menu --session "$session" --client "$client"
-    else
-      tmux display-message "wkt: workspace switching is only available in host sessions"
-    fi
+    wkt-workspace-menu "$session" "$client"
     ;;
   git-status)
     repo_dir=$(tmux show-environment -t "$session" WKT_WORKSPACE_DIR 2>/dev/null | sed -n 's/^WKT_WORKSPACE_DIR=//p')

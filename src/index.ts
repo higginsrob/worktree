@@ -20,6 +20,7 @@ import { resetAction } from './commands/reset.js';
 import { resetHomeAction } from './commands/reset-home.js';
 import { cleanAction } from './commands/clean.js';
 import { setupHostAction } from './commands/setup-host.js';
+import { provisionAction } from './commands/provision.js';
 import { notImplemented } from './commands/stub.js';
 
 const program = new Command();
@@ -75,9 +76,8 @@ program
 program
   .command('switch [name]', { hidden: true })
   .description('used by the tmux statusline: switch this session\'s client to another worktree')
-  .option('--menu', 'show the tmux worktree menu instead of switching directly')
+  .option('--list', 'print tracked worktrees as tab-separated lines (for the statusline menu)')
   .option('--session <name>', 'tmux session being switched away from')
-  .option('--client <name>', 'tmux client to show the menu on')
   .action(switchAction);
 
 program
@@ -153,6 +153,14 @@ program
   .command('setup-host')
   .description('pre-clone the bundled vim plugin set into the host vim runtime (one-time)')
   .action(setupHostAction);
+
+program
+  .command('provision')
+  .description('an interactive developer setup guide after a fresh system install')
+  .option('--yes', 'install everything that is missing without prompting')
+  .option('--dry-run', 'show the commands that would run without running them')
+  .option('--list', 'only show what is installed and what is missing')
+  .action(provisionAction);
 
 program
   .command('exec [cmd...]')

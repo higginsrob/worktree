@@ -172,6 +172,28 @@ touches `host` worktrees (nothing Docker-side exists for them).
 Checks node, git, tmux, vim, and disk space (required for the default host
 mode), plus Docker (reported but optional — only needed for `--sandbox`).
 
+### `wkt provision`
+
+An interactive developer setup guide for a fresh macOS or Linux install.
+Detects what's missing — Homebrew (mac), Node, npm, Bun, Python 3, zsh,
+oh-my-zsh, Docker, Ollama, Claude Code, Cursor Agent, Codex, vim, tmux — and
+shows a multi-select checklist of only the missing items. Each selected item's
+exact command is shown and confirmed before it runs (package manager on
+mac/apt/dnf/pacman/apk, official install scripts elsewhere).
+
+Three config items are also offered:
+
+- **vim config / tmux config** — writes a thin `~/.vimrc` / `~/.tmux.conf`
+  wrapper that sets the `WKT_*` env vars and sources the bundled
+  `docker/vimrc` / `docker/tmux.conf` (a bare symlink would lose the env vars
+  and helper scripts). An existing file is backed up to `<file>.bak.<time>`.
+  Re-run after upgrading wkt to refresh the baked-in paths.
+- **shell aliases** — adds a marked block to `~/.zshrc` (or `~/.bashrc`) that
+  sources `docker/aliases.sh`, the same aliases the sandbox image uses.
+
+Flags: `--yes` (everything missing, no prompts), `--dry-run` (print commands
+only), `--list` (status only).
+
 ### `wkt setup-host`
 
 Pre-clones the bundled vim plugin set into `~/.local/share/wkt/vim-runtime`,

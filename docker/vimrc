@@ -22,6 +22,8 @@ endif
 set nocompatible
 set number
 " set relativenumber
+" Code is read by column, so long lines stay on one screen line (see the
+" prose filetypes below, which opt back into soft wrapping).
 set nowrap
 set expandtab
 set shiftwidth=2
@@ -63,6 +65,32 @@ set splitright
 " and the tokyonight colorscheme.
 
 let g:vim_markdown_folding_disabled = 1
+
+" --- Prose wrapping ------------------------------------------------------
+" Markdown/plain text have no meaningful column structure, so soft-wrap them
+" instead of scrolling sideways: 'linebreak' breaks at 'breakat' characters
+" rather than mid-word, and 'nolist' is required for it to take effect at all
+" (with 'list' on, vim ignores 'linebreak'). 'breakindent' keeps the
+" continuation rows aligned under the line's own indent, so wrapped list items
+" and block quotes stay visually nested. All setlocal, so code buffers in
+" other windows keep 'nowrap'.
+function! s:WktProse() abort
+  setlocal wrap linebreak nolist
+  if exists('&breakindent')
+    setlocal breakindent
+  endif
+  " With wrapping on, one buffer line covers several screen lines; make j/k
+  " (and the arrows) move by screen line so they don't jump a whole paragraph.
+  for l:lhs in ['j', 'k', '<Down>', '<Up>']
+    execute 'nnoremap <buffer> <silent> <expr> ' . l:lhs . " v:count ? '" . l:lhs . "' : 'g" . l:lhs . "'"
+    execute 'xnoremap <buffer> <silent> <expr> ' . l:lhs . " v:count ? '" . l:lhs . "' : 'g" . l:lhs . "'"
+  endfor
+endfunction
+
+augroup wkt_prose_wrap
+  autocmd!
+  autocmd FileType markdown,text,gitcommit call s:WktProse()
+augroup END
 
 " --- Leader key ----------------------------------------------------------
 let mapleader = " "

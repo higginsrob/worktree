@@ -66,6 +66,24 @@ the current window (`splitbelow`/`splitright`), not above/left.
 The `a`/`A`/`d`/`s`/`b` panes close when their command exits successfully; on a
 non-zero exit they stay open in a shell so the error is readable.
 
+## Line wrapping
+
+Code buffers keep `nowrap` — long lines stay on one screen line and the window
+scrolls sideways, so columns stay meaningful. Prose filetypes (`markdown`,
+`text`, `gitcommit`) opt back into soft wrapping instead:
+
+| option        | effect                                                                                              |
+| ------------- | --------------------------------------------------------------------------------------------------- |
+| `wrap`        | long lines flow onto the next screen line, no sideways scroll                                       |
+| `linebreak`   | wraps at spaces/punctuation instead of mid-word                                                     |
+| `nolist`      | required — vim ignores `linebreak` while `list` is on                                               |
+| `breakindent` | continuation rows align under the line's indent, so wrapped list items and block quotes stay nested |
+
+Nothing in the file changes — no hard newlines are inserted, only how the
+buffer is displayed. In those buffers `j`/`k` (and the arrow keys) move by
+screen line rather than buffer line, so one press doesn't skip a whole wrapped
+paragraph; with a count (`5j`) they move by buffer line as usual.
+
 ## Colorscheme & statusline
 
 `tokyonight` (`night` variant, italics on), with a minimal custom statusline

@@ -28,6 +28,8 @@ export interface Item {
   id: string;
   label: string;
   group: 'system' | 'shell' | 'agents' | 'editor' | 'config';
+  // Opt-in: left unchecked in the picker and skipped by --yes.
+  optional?: boolean;
   applies(sys: SystemInfo): boolean;
   detect(sys: SystemInfo): Promise<boolean>;
   plan(sys: SystemInfo): Step[];
@@ -147,6 +149,7 @@ function wrapperItem(
     id,
     label,
     group: 'config',
+    optional: true,
     applies: always,
     detect: async (sys) => (await readOrUndefined(file(sys))) === content(),
     plan: (sys) => {
@@ -213,7 +216,6 @@ export const ITEMS: Item[] = [
   },
   pkgItem('node', 'Node.js', nodeNames),
   pkgItem('npm', 'npm', { ...nodeNames, apt: 'npm', dnf: 'npm', pacman: 'npm', apk: 'npm' }),
-  scriptItem('bun', 'Bun', 'curl -fsSL https://bun.sh/install | bash', 'bun', 'system'),
   pkgItem('python3', 'Python 3', {
     brew: 'python',
     apt: 'python3',
@@ -221,6 +223,22 @@ export const ITEMS: Item[] = [
     pacman: 'python',
     apk: 'python3',
   }),
+  {
+    id: 'uv',
+    label: 'uv',
+    group: 'system',
+    applies: always,
+    detect: () => commandExists('uv'),
+    plan: (sys) => [
+      {
+        kind: 'shell',
+        cmd:
+          sys.os === 'mac' && sys.pkg === 'brew'
+            ? 'brew install uv'
+            : 'curl -LsSf https://astral.sh/uv/install.sh | sh',
+      },
+    ],
+  },
   pkgItem(
     'zsh',
     'zsh',
@@ -229,25 +247,10 @@ export const ITEMS: Item[] = [
     'shell',
   ),
   {
-    id: 'oh-my-zsh',
-    label: 'oh-my-zsh',
-    group: 'shell',
-    applies: always,
-    detect: (sys) =>
-      pathExists(path.join(process.env.ZSH ?? path.join(sys.home, '.oh-my-zsh'), 'oh-my-zsh.sh')),
-    // RUNZSH/CHSH=no: don't launch zsh or change the login shell mid-run;
-    // KEEP_ZSHRC=yes: don't clobber an existing ~/.zshrc.
-    plan: () => [
-      {
-        kind: 'shell',
-        cmd: 'RUNZSH=no CHSH=no KEEP_ZSHRC=yes sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"',
-      },
-    ],
-  },
-  {
     id: 'docker',
     label: 'Docker',
     group: 'system',
+    optional: true,
     applies: always,
     detect: async (sys) =>
       (await commandExists('docker')) ||
@@ -273,9 +276,40 @@ export const ITEMS: Item[] = [
     },
   },
   {
+    id: 'podman',
+    label: 'Podman',
+    group: 'system',
+    optional: true,
+    applies: always,
+    detect: () => commandExists('podman'),
+    plan: (sys) => {
+      if (sys.os === 'mac') {
+        return sys.pkg === 'brew'
+          ? [
+              { kind: 'shell', cmd: 'brew install podman' },
+              {
+                kind: 'manual',
+                text: 'Create and start the Podman VM: podman machine init && podman machine start',
+              },
+            ]
+          : [{ kind: 'manual', text: 'Install Podman: https://podman.io/docs/installation' }];
+      }
+      const cmd = packageInstallCommand(sys, {
+        apt: 'podman',
+        dnf: 'podman',
+        pacman: 'podman',
+        apk: 'podman',
+      });
+      return cmd
+        ? [{ kind: 'shell', cmd }]
+        : [{ kind: 'manual', text: 'Install Podman: https://podman.io/docs/installation' }];
+    },
+  },
+  {
     id: 'ollama',
     label: 'Ollama',
     group: 'agents',
+    optional: true,
     applies: always,
     detect: () => commandExists('ollama'),
     plan: (sys) => [
@@ -289,23 +323,6 @@ export const ITEMS: Item[] = [
     ],
   },
   scriptItem('claude', 'Claude Code', 'curl -fsSL https://claude.ai/install.sh | bash'),
-  scriptItem('cursor-agent', 'Cursor Agent', 'curl https://cursor.com/install -fsS | bash'),
-  {
-    id: 'codex',
-    label: 'Codex CLI',
-    group: 'agents',
-    applies: always,
-    detect: () => commandExists('codex'),
-    plan: (sys) => [
-      {
-        kind: 'shell',
-        cmd:
-          sys.os === 'mac' && sys.pkg === 'brew'
-            ? 'brew install codex'
-            : 'npm install -g @openai/codex',
-      },
-    ],
-  },
   pkgItem(
     'vim',
     'Vim',
@@ -337,6 +354,7 @@ export const ITEMS: Item[] = [
     id: 'aliases',
     label: 'shell aliases',
     group: 'config',
+    optional: true,
     applies: always,
     detect: async (sys) =>
       ((await readOrUndefined(aliasesRcFile(sys))) ?? '').includes(aliasesBlock()),

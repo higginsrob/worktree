@@ -175,13 +175,14 @@ mode), plus Docker (reported but optional — only needed for `--sandbox`).
 ### `wkt provision`
 
 An interactive developer setup guide for a fresh macOS or Linux install.
-Detects what's missing — Homebrew (mac), Node, npm, Bun, Python 3, zsh,
-oh-my-zsh, Docker, Ollama, Claude Code, Cursor Agent, Codex, vim, tmux — and
-shows a multi-select checklist of only the missing items. Each selected item's
+Detects what's missing — Homebrew (mac), Node, npm, Python 3, uv, zsh,
+Docker, Podman, Ollama, Claude Code, vim, tmux — and shows a multi-select
+checklist of only the missing items. Docker, Podman, Ollama and the three
+config items below are opt-in: they start unchecked and `--yes` skips them. Each selected item's
 exact command is shown and confirmed before it runs (package manager on
 mac/apt/dnf/pacman/apk, official install scripts elsewhere).
 
-Three config items are also offered:
+Three opt-in config items are also offered:
 
 - **vim config / tmux config** — writes a thin `~/.vimrc` / `~/.tmux.conf`
   wrapper that sets the `WKT_*` env vars and sources the bundled
@@ -191,7 +192,7 @@ Three config items are also offered:
 - **shell aliases** — adds a marked block to `~/.zshrc` (or `~/.bashrc`) that
   sources `docker/aliases.sh`, the same aliases the sandbox image uses.
 
-Flags: `--yes` (everything missing, no prompts), `--dry-run` (print commands
+Flags: `--yes` (everything missing except the opt-in items, no prompts), `--dry-run` (print commands
 only), `--list` (status only).
 
 ### `wkt setup-host`

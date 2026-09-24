@@ -3,6 +3,8 @@ import readline from 'node:readline';
 export interface MultiSelectOption {
   label: string;
   hint?: string;
+  // Starts checked; defaults to true.
+  selected?: boolean;
 }
 
 // Checklist picker: arrows or j/k to move, Space to toggle, a to toggle all,
@@ -11,9 +13,10 @@ export interface MultiSelectOption {
 export async function multiSelect(
   title: string,
   options: MultiSelectOption[],
-  initiallySelected = true,
 ): Promise<number[] | null> {
-  const selected = new Set<number>(initiallySelected ? options.map((_, i) => i) : []);
+  const selected = new Set<number>(
+    options.flatMap((opt, i) => (opt.selected === false ? [] : [i])),
+  );
   let cursor = 0;
   let linesDrawn = 0;
 

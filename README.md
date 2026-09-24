@@ -27,7 +27,7 @@ Requires git, tmux, vim, and Node.js ≥ 20. Vim plugins are cloned once into
 `~/.local/share/wkt/` on first use (or up front with `wkt setup-host`).
 
 On a fresh machine, `wkt provision` walks you through installing everything
-else (Node, Bun, zsh, Docker, Claude/Codex/Cursor agents, vim, tmux, …) and
+else (Node, Python/uv, zsh, Docker or Podman, Claude Code, vim, tmux, …) and
 wiring up the wkt vim/tmux configs and shell aliases.
 
 ## Quick start

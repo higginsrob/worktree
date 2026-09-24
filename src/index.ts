@@ -157,7 +157,7 @@ program
 program
   .command('provision')
   .description('an interactive developer setup guide after a fresh system install')
-  .option('--yes', 'install everything that is missing without prompting')
+  .option('--yes', 'install everything that is missing (except opt-in items) without prompting')
   .option('--dry-run', 'show the commands that would run without running them')
   .option('--list', 'only show what is installed and what is missing')
   .action(provisionAction);

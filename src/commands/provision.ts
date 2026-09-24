@@ -12,13 +12,7 @@ export interface ProvisionCliOptions {
 // Installers drop binaries in places a fresh shell hasn't put on PATH yet;
 // add them so post-install detection (and later steps) can see them.
 function augmentPath(sys: SystemInfo): void {
-  const extra = [
-    '/opt/homebrew/bin',
-    '/usr/local/bin',
-    path.join(sys.home, '.bun', 'bin'),
-    path.join(sys.home, '.local', 'bin'),
-    path.join(sys.home, '.cursor', 'bin'),
-  ];
+  const extra = ['/opt/homebrew/bin', '/usr/local/bin', path.join(sys.home, '.local', 'bin')];
   const current = (process.env.PATH ?? '').split(':');
   process.env.PATH = [...extra.filter((p) => !current.includes(p)), ...current].join(':');
 }
@@ -99,20 +93,28 @@ export async function provisionAction(options: ProvisionCliOptions): Promise<voi
     return;
   }
 
-  let chosen = missing;
+  let chosen = missing.filter((item) => !item.optional);
   if (!options.yes) {
     if (!process.stdin.isTTY || !process.stdout.isTTY) {
       throw new Error('wkt provision needs an interactive terminal (or pass --yes).');
     }
     const picked = await multiSelect(
       'Select what to install/configure:',
-      missing.map((item) => ({ label: item.label })),
+      missing.map((item) => ({
+        label: item.label,
+        hint: item.optional ? 'optional' : undefined,
+        selected: !item.optional,
+      })),
     );
     if (!picked || picked.length === 0) {
       console.log('\nNothing selected.');
       return;
     }
     chosen = picked.map((i) => missing[i]!);
+  }
+  if (chosen.length === 0) {
+    console.log('\nNothing to install without opting in (run without --yes to choose).');
+    return;
   }
 
   const results: [Item, Outcome][] = [];
